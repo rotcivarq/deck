@@ -503,6 +503,8 @@ const SUIT_SYMBOLS = { Pique: "♠", Cœur: "♥", Trèfle: "♣", Carreau: "♦
 const SUIT_CLASSES = { Pique: "pique", Cœur: "coeur", Trèfle: "trefle", Carreau: "carreau" }
 const MODES = ["Dos","Face","Mixte","Training"]
 const STATS_VERSION = "v2"
+const PLAYER_ID_KEY = "mnemo_player_id"
+const API_BASE = ""
 const STAGES = (() => {
   const res = []
   const max = ORDERED_CARDS.length
@@ -540,6 +542,8 @@ let digits = []
 let stageParMode = { dos: 0, face: 0 }
 let derniereCarte = null
 let stageAckHandler = null
+let playerId = null
+let saveCloudTimeout = null
 
 function cheminCarte(carte) {
   const suitMap = {
@@ -654,6 +658,7 @@ function sauvegarder() {
     stageParMode
   }
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
+  planifierSauvegardeCloud(data)
 }
 
 /* ============================
@@ -886,6 +891,53 @@ function renderTraining() {
       <tbody>${rows}</tbody>
     </table>
   `
+}
+
+function ensurePlayerId() {
+  const stored = localStorage.getItem(PLAYER_ID_KEY)
+  if (stored) {
+    playerId = stored
+    return
+  }
+  playerId = "p_" + Math.random().toString(36).slice(2, 10)
+  localStorage.setItem(PLAYER_ID_KEY, playerId)
+}
+
+async function chargerCloud() {
+  try {
+    const res = await fetch(`${API_BASE}/api/load?playerId=${encodeURIComponent(playerId)}`)
+    if (!res.ok) return
+    const data = await res.json()
+    if (data?.cartes) {
+      cartes = data.cartes
+      if (data.stageParMode) {
+        stageParMode = {
+          dos: Math.min(data.stageParMode.dos ?? 0, STAGES.length - 1),
+          face: Math.min(data.stageParMode.face ?? 0, STAGES.length - 1)
+        }
+      }
+      sauvegarder()
+    }
+  } catch (e) {
+    console.warn("Cloud load failed", e)
+  }
+}
+
+async function sauvegarderCloud(data) {
+  try {
+    await fetch(`${API_BASE}/api/save`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ playerId, payload: data })
+    })
+  } catch (e) {
+    console.warn("Cloud save failed", e)
+  }
+}
+
+function planifierSauvegardeCloud(data) {
+  clearTimeout(saveCloudTimeout)
+  saveCloudTimeout = setTimeout(() => sauvegarderCloud(data), 400)
 }
 
 function setMenu(open) {
@@ -1158,9 +1210,12 @@ importerInput.addEventListener("change", handleImport)
 resetBtn.addEventListener("click", (e) => { e.stopPropagation(); resetProgression() })
 setMenu(false)
 
+ensurePlayerId()
 charger()
-afficherBoutons()
-prochaineCarte()
+chargerCloud().finally(() => {
+  afficherBoutons()
+  prochaineCarte()
+})
 </script>
 
 </body>
