@@ -519,6 +519,7 @@ let stageAckHandler = null
 let stagePending = false
 let playerId = null
 let saveCloudTimeout = null
+let lastPickedLow = false
 
 function cheminCarte(carte) {
   const suitMap = {
@@ -665,20 +666,35 @@ function tirerCarte(mode) {
   if (subset.length === 0) return cartes[0]
 
   const minPoints = Math.min(...subset.map(c => c.stats[key]?.points ?? 0))
-  let candidats = subset.filter(c => (c.stats[key]?.points ?? 0) === minPoints)
+  let lowCards = subset.filter(c => (c.stats[key]?.points ?? 0) === minPoints)
 
+  // éviter de rester bloqué sur une seule carte faible : alterne avec d'autres
+  if (minPoints < 4 && subset.length > 1) {
+    if (lastPickedLow && lowCards.length === 1) {
+      const others = subset.filter(c => c.id !== lowCards[0].id)
+      const pick = others.filter(c => !derniereCarte || c.id !== derniereCarte.id)
+      const choisi = (pick.length ? pick : others)[Math.floor(Math.random() * (pick.length ? pick.length : others.length))]
+      lastPickedLow = false
+      return choisi
+    }
+  }
+
+  let candidats = lowCards
   const minVues = Math.min(...candidats.map(c => c.stats[key]?.vues ?? 0))
   const candidatsVues = candidats.filter(c => (c.stats[key]?.vues ?? 0) === minVues)
   if (candidatsVues.length > 0) candidats = candidatsVues
 
-  return candidats[Math.floor(Math.random() * candidats.length)]
+  const sansDerniere = candidats.filter(c => !derniereCarte || c.id !== derniereCarte.id)
+  const choisi = (sansDerniere.length ? sansDerniere : candidats)[Math.floor(Math.random() * (sansDerniere.length ? sansDerniere.length : candidats.length))]
+  lastPickedLow = minPoints < 4 && lowCards.some(c => c.id === choisi.id)
+  return choisi
 }
 
 function majCarte(carte, mode, bon, temps) {
   const stats = carte.stats[mode.toLowerCase()]
   if (!stats) return
   stats.vues++
-  stats.points = (stats.points || 0) + (bon ? 1 : -1)
+  stats.points = (stats.points || 0) + (bon ? 1 : -2)
   if (bon) {
     stats.succes++
     stats.serie++
@@ -705,7 +721,7 @@ function verifierPalier(mode) {
   const idx = stageParMode[key]
   const range = STAGES[idx] || STAGES[STAGES.length - 1]
   const subset = cartes.filter(c => c.numero >= range.start && c.numero <= range.end)
-  const seuil = 5
+  const seuil = 4
   const complet = subset.every(c => (c.stats[key].points || 0) >= seuil)
   if (complet && idx < STAGES.length - 1) {
     stageParMode[key] = idx + 1
