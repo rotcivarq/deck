@@ -1054,8 +1054,8 @@ function prochaineCarte() {
 
   const modeKey = questionMode.toLowerCase()
   const palierIdx = stageParMode[modeKey] || 0
-  const level = palierIdx + 1
-  const seuil = level
+  const level = 4
+  const seuil = 4
   const pool = cartesDuPalier(questionMode)
 
   while (queueCartes.length === 0) {
