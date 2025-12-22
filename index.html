@@ -337,12 +337,6 @@
     opacity: 0.7;
   }
 
-  #phase-detail {
-    margin-top: 4px;
-    font-size: 12px;
-    opacity: 0.65;
-  }
-
   .carte {
     width: 170px;
     height: 250px;
@@ -445,7 +439,6 @@
 </div>
 
 <div id="phase"></div>
-<div id="phase-detail"></div>
 
 <div id="numeric-zone" class="numeric">
   <div id="numero-input" class="numero-input">
@@ -536,8 +529,7 @@ let stagePending = false
 let playerId = null
 let saveCloudTimeout = null
 let queueCartes = []
-let phase = "full" // "full" | "errors"
-let fullDone = false
+let phase = "full"
 let lastFullSummary = null
 
 function cheminCarte(carte) {
@@ -827,13 +819,7 @@ function majStats() {
   const level = palierIdx + 1
   document.getElementById("stats").textContent =
     `Mode ${displayMode} · Niveau ${level} · Palier ${palier.label} · Points : ${stats.points} · Maîtrise : ${(stats.maitrise * 100).toFixed(0)} % · Poids : ${stats.poids.toFixed(2)}`
-  document.getElementById("phase").textContent = `Phase : ${phase === "full" ? "Passe complète" : "Rattrapage erreurs"}`
-  const detail = document.getElementById("phase-detail")
-  if (phase === "errors" && lastFullSummary) {
-    detail.textContent = `Fin passe complète : ${lastFullSummary.ok} réussies / ${lastFullSummary.fail} ratées · Rattrapage cartes < ${level}`
-  } else {
-    detail.textContent = ""
-  }
+  document.getElementById("phase").textContent = `Phase : Passe complète${lastFullSummary ? ` · Dernière passe : ${lastFullSummary.ok} réussies / ${lastFullSummary.fail} ratées` : ""}`
 }
 
 function renderTraining() {
@@ -891,7 +877,6 @@ function ensurePlayerId() {
 function resetCycle() {
   phase = "full"
   queueCartes = []
-  fullDone = false
   lastFullSummary = null
   derniereCarte = null
 }
@@ -1074,51 +1059,35 @@ function prochaineCarte() {
   const pool = cartesDuPalier(questionMode)
 
   while (queueCartes.length === 0) {
-    if (phase === "full") {
-      if (!fullDone) {
-        queueCartes = shuffle([...pool])
-        fullDone = true
-        break
-      } else {
-        const ok = pool.filter(c => (c.stats[modeKey]?.points ?? 0) >= seuil).length
-        const fail = pool.length - ok
-        lastFullSummary = { ok, fail }
-        phase = "errors"
-      }
-    }
+    queueCartes = shuffle([...pool])
+    const ok = pool.filter(c => (c.stats[modeKey]?.points ?? 0) >= seuil).length
+    const fail = pool.length - ok
+    lastFullSummary = { ok, fail }
 
-    if (phase === "errors") {
-      const enRetard = pool.filter(c => (c.stats[modeKey]?.points ?? 0) < seuil)
-      if (enRetard.length === 0) {
-        const oldStage = palierIdx
-        if (oldStage < STAGES.length - 1) {
-          stageParMode[modeKey] = oldStage + 1
-          const next = STAGES[stageParMode[modeKey]]
-          if (next.start === 1) {
-            cartes.forEach(c => {
-              const st = c.stats[modeKey]
-              if (st) {
-                st.points = 0
-                st.poids = calculPoids(st)
-              }
-            })
-          }
-          resetCycle()
-          stagePending = true
-          sauvegarder()
-          showStageMessage(`Palier ${STAGES[oldStage].label} terminé (${questionMode}) → ${next.label}`)
-          lancerConfetti()
-          majStats()
-          return
-        } else {
-          resetCycle()
-          queueCartes = shuffle([...pool])
-          break
+    if (fail === 0) {
+      const oldStage = palierIdx
+      if (oldStage < STAGES.length - 1) {
+        stageParMode[modeKey] = oldStage + 1
+        const next = STAGES[stageParMode[modeKey]]
+        if (next.start === 1) {
+          cartes.forEach(c => {
+            const st = c.stats[modeKey]
+            if (st) {
+              st.points = 0
+              st.poids = calculPoids(st)
+            }
+          })
         }
-      } else {
-        queueCartes = shuffle(enRetard)
-        break
+        resetCycle()
+        stagePending = true
+        sauvegarder()
+        showStageMessage(`Palier ${STAGES[oldStage].label} terminé (${questionMode}) → ${next.label} · ${ok} réussies / ${fail} ratées`)
+        lancerConfetti()
+        majStats()
+        return
       }
+    } else {
+      break
     }
   }
 
