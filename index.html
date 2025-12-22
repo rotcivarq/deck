@@ -523,6 +523,7 @@ let menuTimeout = null
 let questionMode = "Face"
 let digits = []
 let stageParMode = { dos: 0, face: 0 }
+let thresholdParMode = { dos: 1, face: 1 }
 let derniereCarte = null
 let stageAckHandler = null
 let stagePending = false
@@ -635,6 +636,15 @@ function charger() {
         face: Math.min(sauvegarde.stageParMode.face ?? 0, STAGES.length - 1)
       }
     }
+
+    if (sauvegarde.thresholdParMode) {
+      thresholdParMode = {
+        dos: sauvegarde.thresholdParMode.dos ?? 1,
+        face: sauvegarde.thresholdParMode.face ?? 1
+      }
+    } else {
+      thresholdParMode = { dos: 1, face: 1 }
+    }
   } else {
     creerDeck()
   }
@@ -644,7 +654,8 @@ function sauvegarder() {
   const data = {
     version: STATS_VERSION,
     cartes,
-    stageParMode
+    stageParMode,
+    thresholdParMode
   }
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
   planifierSauvegardeCloud(data)
@@ -900,6 +911,14 @@ async function chargerCloud() {
           face: Math.min(data.stageParMode.face ?? 0, STAGES.length - 1)
         }
       }
+      if (data.thresholdParMode) {
+        thresholdParMode = {
+          dos: data.thresholdParMode.dos ?? 1,
+          face: data.thresholdParMode.face ?? 1
+        }
+      } else {
+        thresholdParMode = { dos: 1, face: 1 }
+      }
       sauvegarder()
     }
   } catch (e) {
@@ -1065,7 +1084,7 @@ function prochaineCarte() {
   const modeKey = questionMode.toLowerCase()
   const palierIdx = stageParMode[modeKey] || 0
   const level = palierIdx + 1
-  const seuil = 4
+  const seuil = Math.min(4, thresholdParMode[modeKey] || 1)
   const pool = cartesDuPalier(questionMode)
 
   while (queueCartes.length === 0) {
@@ -1088,6 +1107,7 @@ function prochaineCarte() {
               }
             })
           }
+          thresholdParMode[modeKey] = 1
           resetCycle()
           stagePending = true
           sauvegarder()
@@ -1109,6 +1129,10 @@ function prochaineCarte() {
     } else { // queueType errors
       const retard = pool.filter(c => (c.stats[modeKey]?.points ?? 0) < seuil)
       if (retard.length === 0) {
+        // seuil atteint, on passe au seuil suivant si <4
+        if (seuil < 4) {
+          thresholdParMode[modeKey] = seuil + 1
+        }
         queueType = "full"
         queueCartes = shuffle([...pool])
         break
@@ -1177,6 +1201,7 @@ function resetProgression() {
     st.points = 0
     st.poids = calculPoids(st)
   })
+  thresholdParMode[modeKey] = 1
   resetCycle()
   errorsThisRound.clear()
   queueType = "full"
@@ -1187,6 +1212,7 @@ function resetProgression() {
 
 function fullReset() {
   stageParMode = { dos: 0, face: 0 }
+  thresholdParMode = { dos: 1, face: 1 }
   cartes.forEach(c => {
     Object.values(c.stats).forEach(st => {
       st.points = 0
