@@ -520,6 +520,8 @@ let stagePending = false
 let playerId = null
 let saveCloudTimeout = null
 let lastPickedLow = false
+let queueCartes = []
+let queueErreurs = []
 
 function cheminCarte(carte) {
   const suitMap = {
@@ -659,35 +661,18 @@ function calculPoids(stats) {
   return Math.max(0.05, p)
 }
 
-function tirerCarte(mode) {
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[arr[i], arr[j]] = [arr[j], arr[i]]
+  }
+  return arr
+}
+
+function cartesDuPalier(mode) {
   const key = mode.toLowerCase()
   const range = STAGES[stageParMode[key]] || STAGES[STAGES.length - 1]
-  const subset = cartes.filter(c => c.numero >= range.start && c.numero <= range.end)
-  if (subset.length === 0) return cartes[0]
-
-  const minPoints = Math.min(...subset.map(c => c.stats[key]?.points ?? 0))
-  let lowCards = subset.filter(c => (c.stats[key]?.points ?? 0) === minPoints)
-
-  // éviter de rester bloqué sur une seule carte faible : alterne avec d'autres
-  if (minPoints < 4 && subset.length > 1) {
-    if (lastPickedLow && lowCards.length === 1) {
-      const others = subset.filter(c => c.id !== lowCards[0].id)
-      const pick = others.filter(c => !derniereCarte || c.id !== derniereCarte.id)
-      const choisi = (pick.length ? pick : others)[Math.floor(Math.random() * (pick.length ? pick.length : others.length))]
-      lastPickedLow = false
-      return choisi
-    }
-  }
-
-  let candidats = lowCards
-  const minVues = Math.min(...candidats.map(c => c.stats[key]?.vues ?? 0))
-  const candidatsVues = candidats.filter(c => (c.stats[key]?.vues ?? 0) === minVues)
-  if (candidatsVues.length > 0) candidats = candidatsVues
-
-  const sansDerniere = candidats.filter(c => !derniereCarte || c.id !== derniereCarte.id)
-  const choisi = (sansDerniere.length ? sansDerniere : candidats)[Math.floor(Math.random() * (sansDerniere.length ? sansDerniere.length : candidats.length))]
-  lastPickedLow = minPoints < 4 && lowCards.some(c => c.id === choisi.id)
-  return choisi
+  return cartes.filter(c => c.numero >= range.start && c.numero <= range.end)
 }
 
 function majCarte(carte, mode, bon, temps) {
@@ -1031,6 +1016,12 @@ function tenterValidation() {
   majCarte(carteActuelle, questionMode, bon, temps)
   sauvegarder()
 
+  if (!bon) {
+    if (!queueErreurs.some(c => c.id === carteActuelle.id)) {
+      queueErreurs.push(carteActuelle)
+    }
+  }
+
   document.getElementById("feedback").textContent =
     bon
       ? `✔ ${carteActuelle.valeur} de ${carteActuelle.couleur} (${Math.round(temps)} ms)`
@@ -1068,15 +1059,34 @@ function prochaineCarte() {
     renderTraining()
     return
   }
+  // si fin de palier en attente de clic, ne pas avancer
+  if (stagePending) return
+
   questionMode =
     modeActuel === "Mixte"
       ? (Math.random() < 0.5 ? "Dos" : "Face")
       : (modeActuel === "Entrainement" ? "Dos" : modeActuel)
-  let tentative = 0
-  do {
-    carteActuelle = tirerCarte(questionMode)
-    tentative++
-  } while (derniereCarte && carteActuelle && carteActuelle.id === derniereCarte.id && tentative < 5)
+
+  if (queueCartes.length === 0) {
+    if (queueErreurs.length > 0) {
+      queueCartes = shuffle([...queueErreurs])
+      queueErreurs = []
+    } else {
+      queueCartes = shuffle(cartesDuPalier(questionMode))
+    }
+  }
+
+  // éviter la même carte deux fois de suite si possible
+  if (derniereCarte && queueCartes.length > 1 && queueCartes[0].id === derniereCarte.id) {
+    const swapIdx = queueCartes.findIndex(c => c.id !== derniereCarte.id)
+    if (swapIdx > 0) {
+      const tmp = queueCartes[0]
+      queueCartes[0] = queueCartes[swapIdx]
+      queueCartes[swapIdx] = tmp
+    }
+  }
+
+  carteActuelle = queueCartes.shift()
   derniereCarte = carteActuelle
   afficherCarte()
 }
