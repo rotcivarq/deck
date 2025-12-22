@@ -82,28 +82,6 @@
     box-shadow: 0 10px 22px rgba(0,0,0,0.12);
   }
 
-  .exporter {
-    margin: 10px auto 0;
-    display: flex;
-    justify-content: center;
-    gap: 10px;
-  }
-
-  .importer-input {
-    display: none;
-  }
-
-  .importer-label {
-    display: inline-block;
-    padding: 10px 16px;
-    border-radius: 999px;
-    background: #ffffff;
-    border: 1px solid rgba(0,0,0,0.08);
-    cursor: pointer;
-    font-weight: 700;
-    box-shadow: 0 8px 18px rgba(0,0,0,0.1);
-  }
-
   .numeric {
     display: none;
     flex-direction: column;
@@ -444,13 +422,6 @@
 <div id="menu-panel" class="menu-panel hidden">
   <div id="menu" class="menu"></div>
  </div>
-
-<div class="exporter">
-  <button id="exporter">Exporter la progression</button>
-  <label for="importer" class="importer-label">Importer</label>
-  <input id="importer" type="file" accept="application/json" class="importer-input" />
-  <button id="reset">Reset memory</button>
-</div>
 
 <div id="carte" class="carte" aria-label="Carte">
   <img id="carte-face" class="carte-face" alt="" />
@@ -1114,100 +1085,15 @@ function showStageMessage(msg) {
   document.addEventListener("click", stageAckHandler, true)
 }
 
-function exporterPoints() {
-  const payload = cartes.map(c => ({
-    id: c.id,
-    numero: c.numero,
-    valeur: c.valeur,
-    couleur: c.couleur,
-    dos: { points: c.stats.dos.points, maitrise: c.stats.dos.maitrise, tempsMoyen: c.stats.dos.tempsMoyen },
-    face: { points: c.stats.face.points, maitrise: c.stats.face.maitrise, tempsMoyen: c.stats.face.tempsMoyen }
-  }))
-  const blob = new Blob([JSON.stringify({ cartes: payload, stageParMode }, null, 2)], { type: "application/json" })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement("a")
-  a.href = url
-  a.download = "points-cartes.json"
-  a.click()
-  URL.revokeObjectURL(url)
-}
-
-function handleImport(ev) {
-  const file = ev.target.files?.[0]
-  if (!file) return
-  const reader = new FileReader()
-  reader.onload = () => {
-    try {
-      const data = JSON.parse(reader.result)
-      if (Array.isArray(data.cartes)) {
-        // compat ancien export (tableau simple)
-        const payload = data.cartes
-        cartes.forEach(c => {
-          const found = payload.find(p => p.id === c.id)
-          if (found) {
-            c.stats.dos.points = found.dos?.points || 0
-            c.stats.dos.maitrise = found.dos?.maitrise || 0
-            c.stats.dos.tempsMoyen = found.dos?.tempsMoyen || null
-            c.stats.face.points = found.face?.points || 0
-            c.stats.face.maitrise = found.face?.maitrise || 0
-            c.stats.face.tempsMoyen = found.face?.tempsMoyen || null
-            c.stats.dos.poids = calculPoids(c.stats.dos)
-            c.stats.face.poids = calculPoids(c.stats.face)
-          }
-        })
-      } else if (Array.isArray(data)) {
-        // très ancien format tableau simple sans clé cartes
-        data.forEach(p => {
-          const found = cartes.find(c => c.id === p.id)
-          if (found) {
-            found.stats.dos.points = p.points || 0
-            found.stats.dos.maitrise = p.maitrise || 0
-            found.stats.dos.tempsMoyen = p.tempsMoyen || null
-            found.stats.dos.poids = calculPoids(found.stats.dos)
-          }
-        })
-      }
-      if (data.stageParMode) {
-        stageParMode = {
-          dos: Math.min(data.stageParMode.dos ?? 0, STAGES.length - 1),
-          face: Math.min(data.stageParMode.face ?? 0, STAGES.length - 1)
-        }
-      }
-      sauvegarder()
-      afficherBoutons()
-      prochaineCarte()
-    } catch (err) {
-      console.error("Import invalide", err)
-    } finally {
-      ev.target.value = ""
-    }
-  }
-  reader.readAsText(file)
-}
-
-function resetProgression() {
-  creerDeck()
-  stageParMode = { dos: 0, face: 0 }
-  sauvegarder()
-  afficherBoutons()
-  prochaineCarte()
-}
-
 /* ============================
    LANCEMENT
 ============================ */
 
 const burgerBtn = document.getElementById("burger")
 const menuPanel = document.getElementById("menu-panel")
-const exporterBtn = document.getElementById("exporter")
-const importerInput = document.getElementById("importer")
-const resetBtn = document.getElementById("reset")
 burgerBtn.addEventListener("click", (e) => { e.stopPropagation(); setMenu(!menuOuvert) })
 menuPanel.addEventListener("click", (e) => e.stopPropagation())
 document.addEventListener("click", () => setMenu(false))
-exporterBtn.addEventListener("click", (e) => { e.stopPropagation(); exporterPoints() })
-importerInput.addEventListener("change", handleImport)
-resetBtn.addEventListener("click", (e) => { e.stopPropagation(); resetProgression() })
 setMenu(false)
 
 ensurePlayerId()
