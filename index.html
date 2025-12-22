@@ -331,6 +331,12 @@
     opacity: 0.6;
   }
 
+  #phase {
+    margin-top: 6px;
+    font-size: 12px;
+    opacity: 0.7;
+  }
+
   .carte {
     width: 170px;
     height: 250px;
@@ -431,6 +437,8 @@
   <div id="numero">–</div>
 </div>
 
+<div id="phase"></div>
+
 <div id="numeric-zone" class="numeric">
   <div id="numero-input" class="numero-input">
     <span class="digit-box" data-idx="0">–</span>
@@ -522,6 +530,8 @@ let saveCloudTimeout = null
 let lastPickedLow = false
 let queueCartes = []
 let queueErreurs = []
+let phase = "full" // "full" | "errors"
+let targetPoints = 0
 
 function cheminCarte(carte) {
   const suitMap = {
@@ -834,6 +844,7 @@ function majStats() {
   const palier = STAGES[stageParMode[modeKey]] || STAGES[STAGES.length - 1]
   document.getElementById("stats").textContent =
     `Mode ${displayMode} · Palier ${palier.label} · Points : ${stats.points} · Maîtrise : ${(stats.maitrise * 100).toFixed(0)} % · Poids : ${stats.poids.toFixed(2)}`
+  document.getElementById("phase").textContent = `Phase : ${phase === "full" ? "Passe complète" : "Rattrapage erreurs"}`
 }
 
 function renderTraining() {
@@ -1068,11 +1079,19 @@ function prochaineCarte() {
       : (modeActuel === "Entrainement" ? "Dos" : modeActuel)
 
   if (queueCartes.length === 0) {
-    if (queueErreurs.length > 0) {
-      queueCartes = shuffle([...queueErreurs])
+    const pool = cartesDuPalier(questionMode)
+    targetPoints = Math.max(...pool.map(c => c.stats[questionMode.toLowerCase()]?.points ?? 0))
+    if (phase === "full") {
+      queueCartes = shuffle([...pool])
       queueErreurs = []
     } else {
-      queueCartes = shuffle(cartesDuPalier(questionMode))
+      const enRetard = pool.filter(c => (targetPoints - (c.stats[questionMode.toLowerCase()]?.points ?? 0)) > 0)
+      if (enRetard.length === 0) {
+        phase = "full"
+        queueCartes = shuffle([...pool])
+      } else {
+        queueCartes = enRetard
+      }
     }
   }
 
