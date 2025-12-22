@@ -527,11 +527,9 @@ let stageAckHandler = null
 let stagePending = false
 let playerId = null
 let saveCloudTimeout = null
-let lastPickedLow = false
 let queueCartes = []
-let queueErreurs = []
 let phase = "full" // "full" | "errors"
-let targetPoints = 0
+let fullDone = false
 
 function cheminCarte(carte) {
   const suitMap = {
@@ -711,32 +709,6 @@ function majCarte(carte, mode, bon, temps) {
   stats.poids = calculPoids(stats)
 }
 
-function verifierPalier(mode) {
-  const key = mode.toLowerCase()
-  const idx = stageParMode[key]
-  const range = STAGES[idx] || STAGES[STAGES.length - 1]
-  const subset = cartes.filter(c => c.numero >= range.start && c.numero <= range.end)
-  const seuil = 4
-  const complet = subset.every(c => (c.stats[key].points || 0) >= seuil)
-  if (complet && idx < STAGES.length - 1) {
-    stageParMode[key] = idx + 1
-    const prochain = STAGES[stageParMode[key]]
-    if (prochain.start === 1) {
-      cartes.forEach(c => {
-        const st = c.stats[key]
-        if (!st) return
-        st.points = 0
-        st.poids = calculPoids(st)
-      })
-    }
-    stagePending = true
-    sauvegarder()
-    showStageMessage(`Palier ${range.label} terminé (${mode}) → ${prochain.label}`)
-    lancerConfetti()
-    majStats()
-  }
-}
-
 /* ============================
    INTERFACE
 ============================ */
@@ -841,9 +813,11 @@ function majStats() {
   const modeKey = (modeActuel === "Mixte" ? questionMode : modeActuel).toLowerCase()
   const stats = carteActuelle.stats[modeKey]
   if (!stats) return
-  const palier = STAGES[stageParMode[modeKey]] || STAGES[STAGES.length - 1]
+  const palierIdx = stageParMode[modeKey] || 0
+  const palier = STAGES[palierIdx] || STAGES[STAGES.length - 1]
+  const level = palierIdx + 1
   document.getElementById("stats").textContent =
-    `Mode ${displayMode} · Palier ${palier.label} · Points : ${stats.points} · Maîtrise : ${(stats.maitrise * 100).toFixed(0)} % · Poids : ${stats.poids.toFixed(2)}`
+    `Mode ${displayMode} · Niveau ${level} · Palier ${palier.label} · Points : ${stats.points} · Maîtrise : ${(stats.maitrise * 100).toFixed(0)} % · Poids : ${stats.poids.toFixed(2)}`
   document.getElementById("phase").textContent = `Phase : ${phase === "full" ? "Passe complète" : "Rattrapage erreurs"}`
 }
 
@@ -897,6 +871,13 @@ function ensurePlayerId() {
   }
   playerId = "p_" + Math.random().toString(36).slice(2, 10)
   localStorage.setItem(PLAYER_ID_KEY, playerId)
+}
+
+function resetCycle() {
+  phase = "full"
+  queueCartes = []
+  fullDone = false
+  derniereCarte = null
 }
 
 async function chargerCloud() {
@@ -1027,13 +1008,6 @@ function tenterValidation() {
   majCarte(carteActuelle, questionMode, bon, temps)
   sauvegarder()
 
-  if (!bon) {
-    if (!queueErreurs.some(c => c.id === carteActuelle.id)) {
-      queueErreurs.push(carteActuelle)
-    }
-    phase = "errors"
-  }
-
   document.getElementById("feedback").textContent =
     bon
       ? `✔ ${carteActuelle.valeur} de ${carteActuelle.couleur} (${Math.round(temps)} ms)`
@@ -1046,8 +1020,6 @@ function tenterValidation() {
   }
 
   majStats()
-
-  verifierPalier(questionMode)
   const flash = document.getElementById("flash")
   flash.className = `flash ${bon ? "good" : "bad"} visible`
   if (bon) {
@@ -1079,19 +1051,54 @@ function prochaineCarte() {
       ? (Math.random() < 0.5 ? "Dos" : "Face")
       : (modeActuel === "Entrainement" ? "Dos" : modeActuel)
 
-  if (queueCartes.length === 0) {
-    const pool = cartesDuPalier(questionMode)
-    targetPoints = Math.max(...pool.map(c => c.stats[questionMode.toLowerCase()]?.points ?? 0))
+  const modeKey = questionMode.toLowerCase()
+  const palierIdx = stageParMode[modeKey] || 0
+  const level = palierIdx + 1
+  const seuil = level
+  const pool = cartesDuPalier(questionMode)
+
+  while (queueCartes.length === 0) {
     if (phase === "full") {
-      queueCartes = shuffle([...pool])
-      queueErreurs = []
-    } else {
-      const enRetard = pool.filter(c => (targetPoints - (c.stats[questionMode.toLowerCase()]?.points ?? 0)) > 0)
-      if (enRetard.length === 0) {
-        phase = "full"
+      if (!fullDone) {
         queueCartes = shuffle([...pool])
+        fullDone = true
+        break
       } else {
-        queueCartes = enRetard
+        phase = "errors"
+      }
+    }
+
+    if (phase === "errors") {
+      const enRetard = pool.filter(c => (c.stats[modeKey]?.points ?? 0) < seuil)
+      if (enRetard.length === 0) {
+        const oldStage = palierIdx
+        if (oldStage < STAGES.length - 1) {
+          stageParMode[modeKey] = oldStage + 1
+          const next = STAGES[stageParMode[modeKey]]
+          if (next.start === 1) {
+            cartes.forEach(c => {
+              const st = c.stats[modeKey]
+              if (st) {
+                st.points = 0
+                st.poids = calculPoids(st)
+              }
+            })
+          }
+          resetCycle()
+          stagePending = true
+          sauvegarder()
+          showStageMessage(`Palier ${STAGES[oldStage].label} terminé (${questionMode}) → ${next.label}`)
+          lancerConfetti()
+          majStats()
+          return
+        } else {
+          resetCycle()
+          queueCartes = shuffle([...pool])
+          break
+        }
+      } else {
+        queueCartes = shuffle(enRetard)
+        break
       }
     }
   }
