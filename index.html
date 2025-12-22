@@ -514,6 +514,7 @@ let digits = []
 let stageParMode = { dos: 0, face: 0 }
 let derniereCarte = null
 let stageAckHandler = null
+let stagePending = false
 let playerId = null
 let saveCloudTimeout = null
 
@@ -706,6 +707,7 @@ function verifierPalier(mode) {
   const complet = subset.every(c => (c.stats[key].points || 0) >= seuil)
   if (complet && idx < STAGES.length - 1) {
     stageParMode[key] = idx + 1
+    stagePending = true
     sauvegarder()
     const prochain = STAGES[stageParMode[key]]
     showStageMessage(`Palier ${range.label} terminé (${mode}) → ${prochain.label}`)
@@ -1022,14 +1024,14 @@ function tenterValidation() {
   if (bon) {
     setTimeout(() => {
       flash.classList.remove("visible")
-      prochaineCarte()
+      if (!stagePending) prochaineCarte()
     }, 320)
   } else {
     const handler = () => {
       flash.classList.remove("visible")
       document.getElementById("overlay-correction").classList.remove("visible")
       document.removeEventListener("click", handler, true)
-      prochaineCarte()
+      if (!stagePending) prochaineCarte()
     }
     document.addEventListener("click", handler, true)
   }
@@ -1061,12 +1063,12 @@ function lancerConfetti() {
     const piece = document.createElement("div")
     piece.className = "confetti-piece"
     piece.style.left = Math.random() * 100 + "vw"
-    piece.style.animationDuration = (1.8 + Math.random() * 1.4).toFixed(2) + "s"
-    piece.style.animationDelay = (Math.random() * 0.6).toFixed(2) + "s"
+    piece.style.animationDuration = (3 + Math.random() * 2).toFixed(2) + "s"
+    piece.style.animationDelay = (Math.random() * 1.2).toFixed(2) + "s"
     piece.style.background = couleurs[Math.floor(Math.random() * couleurs.length)]
     container.appendChild(piece)
   }
-  setTimeout(() => { container.innerHTML = "" }, 5000)
+  setTimeout(() => { container.innerHTML = "" }, 8000)
 }
 
 function showStageMessage(msg) {
@@ -1081,6 +1083,8 @@ function showStageMessage(msg) {
     el.classList.remove("visible")
     document.getElementById("confetti").innerHTML = ""
     document.removeEventListener("click", stageAckHandler, true)
+    stagePending = false
+    prochaineCarte()
     stageAckHandler = null
   }
   document.addEventListener("click", stageAckHandler, true)
