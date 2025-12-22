@@ -531,6 +531,8 @@ let saveCloudTimeout = null
 let queueCartes = []
 let phase = "full"
 let lastFullSummary = null
+let errorsThisRound = new Set()
+let queueType = "full" // "full" ou "errors"
 
 function cheminCarte(carte) {
   const suitMap = {
@@ -819,7 +821,9 @@ function majStats() {
   const level = palierIdx + 1
   document.getElementById("stats").textContent =
     `Mode ${displayMode} · Niveau ${level} · Palier ${palier.label} · Points : ${stats.points} · Maîtrise : ${(stats.maitrise * 100).toFixed(0)} % · Poids : ${stats.poids.toFixed(2)}`
-  document.getElementById("phase").textContent = `Phase : Passe complète${lastFullSummary ? ` · Dernière passe : ${lastFullSummary.ok} réussies / ${lastFullSummary.fail} ratées` : ""}`
+  const phaseLabel = queueType === "errors" ? "Rattrapage erreurs" : "Passe complète"
+  const resume = lastFullSummary ? ` · Dernière passe : ${lastFullSummary.ok} réussies / ${lastFullSummary.fail} ratées` : ""
+  document.getElementById("phase").textContent = `Phase : ${phaseLabel}${resume}`
 }
 
 function renderTraining() {
@@ -878,6 +882,8 @@ function resetCycle() {
   phase = "full"
   queueCartes = []
   lastFullSummary = null
+  errorsThisRound = new Set()
+  queueType = "full"
   derniereCarte = null
 }
 
@@ -1009,6 +1015,10 @@ function tenterValidation() {
   majCarte(carteActuelle, questionMode, bon, temps)
   sauvegarder()
 
+  if (!bon && queueType === "full") {
+    errorsThisRound.add(carteActuelle.id)
+  }
+
   document.getElementById("feedback").textContent =
     bon
       ? `✔ ${carteActuelle.valeur} de ${carteActuelle.couleur} (${Math.round(temps)} ms)`
@@ -1054,40 +1064,62 @@ function prochaineCarte() {
 
   const modeKey = questionMode.toLowerCase()
   const palierIdx = stageParMode[modeKey] || 0
-  const level = 4
+  const level = palierIdx + 1
   const seuil = 4
   const pool = cartesDuPalier(questionMode)
 
   while (queueCartes.length === 0) {
-    queueCartes = shuffle([...pool])
-    const ok = pool.filter(c => (c.stats[modeKey]?.points ?? 0) >= seuil).length
-    const fail = pool.length - ok
-    lastFullSummary = { ok, fail }
+    if (queueType === "full") {
+      const ok = pool.filter(c => (c.stats[modeKey]?.points ?? 0) >= seuil).length
+      const fail = pool.length - ok
+      lastFullSummary = { ok, fail }
 
-    if (fail === 0) {
-      const oldStage = palierIdx
-      if (oldStage < STAGES.length - 1) {
-        stageParMode[modeKey] = oldStage + 1
-        const next = STAGES[stageParMode[modeKey]]
-        if (next.start === 1) {
-          cartes.forEach(c => {
-            const st = c.stats[modeKey]
-            if (st) {
-              st.points = 0
-              st.poids = calculPoids(st)
-            }
-          })
+      if (fail === 0) {
+        const oldStage = palierIdx
+        if (oldStage < STAGES.length - 1) {
+          stageParMode[modeKey] = oldStage + 1
+          const next = STAGES[stageParMode[modeKey]]
+          if (next.start === 1) {
+            cartes.forEach(c => {
+              const st = c.stats[modeKey]
+              if (st) {
+                st.points = 0
+                st.poids = calculPoids(st)
+              }
+            })
+          }
+          resetCycle()
+          stagePending = true
+          sauvegarder()
+          showStageMessage(`Palier ${STAGES[oldStage].label} terminé (${questionMode}) → ${next.label} · ${ok} réussies / ${fail} ratées`)
+          lancerConfetti()
+          majStats()
+          return
+        } else {
+          queueCartes = []
+          break
         }
-        resetCycle()
-        stagePending = true
-        sauvegarder()
-        showStageMessage(`Palier ${STAGES[oldStage].label} terminé (${questionMode}) → ${next.label} · ${ok} réussies / ${fail} ratées`)
-        lancerConfetti()
-        majStats()
-        return
+      } else if (errorsThisRound.size > 0) {
+        queueType = "errors"
+        queueCartes = shuffle(pool.filter(c => errorsThisRound.has(c.id)))
+        errorsThisRound.clear()
+        break
+      } else {
+        queueType = "full"
+        queueCartes = shuffle([...pool])
+        break
       }
-    } else {
-      break
+    } else { // queueType errors
+      const retard = pool.filter(c => (c.stats[modeKey]?.points ?? 0) < seuil)
+      if (retard.length === 0) {
+        queueType = "full"
+        queueCartes = shuffle([...pool])
+        break
+      } else {
+        queueType = "full"
+        queueCartes = shuffle([...pool])
+        break
+      }
     }
   }
 
@@ -1150,6 +1182,8 @@ function resetProgression() {
     st.poids = calculPoids(st)
   })
   resetCycle()
+  errorsThisRound.clear()
+  queueType = "full"
   sauvegarder()
   afficherBoutons()
   prochaineCarte()
@@ -1170,6 +1204,8 @@ function fullReset() {
     })
   })
   resetCycle()
+  errorsThisRound.clear()
+  queueType = "full"
   sauvegarder()
   afficherBoutons()
   prochaineCarte()
