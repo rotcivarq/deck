@@ -337,6 +337,12 @@
     opacity: 0.7;
   }
 
+  #phase-detail {
+    margin-top: 4px;
+    font-size: 12px;
+    opacity: 0.65;
+  }
+
   .carte {
     width: 170px;
     height: 250px;
@@ -438,6 +444,7 @@
 </div>
 
 <div id="phase"></div>
+<div id="phase-detail"></div>
 
 <div id="numeric-zone" class="numeric">
   <div id="numero-input" class="numero-input">
@@ -530,6 +537,7 @@ let saveCloudTimeout = null
 let queueCartes = []
 let phase = "full" // "full" | "errors"
 let fullDone = false
+let lastFullSummary = null
 
 function cheminCarte(carte) {
   const suitMap = {
@@ -819,6 +827,12 @@ function majStats() {
   document.getElementById("stats").textContent =
     `Mode ${displayMode} · Niveau ${level} · Palier ${palier.label} · Points : ${stats.points} · Maîtrise : ${(stats.maitrise * 100).toFixed(0)} % · Poids : ${stats.poids.toFixed(2)}`
   document.getElementById("phase").textContent = `Phase : ${phase === "full" ? "Passe complète" : "Rattrapage erreurs"}`
+  const detail = document.getElementById("phase-detail")
+  if (phase === "errors" && lastFullSummary) {
+    detail.textContent = `Fin passe complète : ${lastFullSummary.ok} réussies / ${lastFullSummary.fail} ratées · Rattrapage cartes < ${level}`
+  } else {
+    detail.textContent = ""
+  }
 }
 
 function renderTraining() {
@@ -877,6 +891,7 @@ function resetCycle() {
   phase = "full"
   queueCartes = []
   fullDone = false
+  lastFullSummary = null
   derniereCarte = null
 }
 
@@ -1064,6 +1079,9 @@ function prochaineCarte() {
         fullDone = true
         break
       } else {
+        const ok = pool.filter(c => (c.stats[modeKey]?.points ?? 0) >= seuil).length
+        const fail = pool.length - ok
+        lastFullSummary = { ok, fail }
         phase = "errors"
       }
     }
