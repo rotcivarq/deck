@@ -1,0 +1,1167 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Mémoire des cartes</title>
+
+<style>
+  body {
+    margin: 0;
+    padding: 20px;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont;
+    background: #f7f7f7;
+    color: #0e0e0e;
+    text-align: center;
+  }
+
+  h1 {
+    font-size: 22px;
+    margin-bottom: 30px;
+    opacity: 0.9;
+    color: #141414;
+  }
+
+  .burger {
+    position: fixed;
+    top: 16px;
+    left: 16px;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: 1px solid rgba(0,0,0,0.08);
+    background: #ffffff;
+    font-size: 20px;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 8px 18px rgba(0,0,0,0.12);
+    z-index: 10;
+    transition: transform 120ms ease, box-shadow 120ms ease;
+  }
+
+  .burger:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 10px 22px rgba(0,0,0,0.16);
+  }
+
+  .menu-panel {
+    position: fixed;
+    top: 70px;
+    left: 16px;
+    background: #ffffff;
+    border: 1px solid rgba(0,0,0,0.08);
+    border-radius: 12px;
+    box-shadow: 0 14px 28px rgba(0,0,0,0.16);
+    padding: 10px;
+    z-index: 9;
+  }
+
+  .menu-panel.hidden {
+    display: none;
+  }
+
+  .menu {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .menu button {
+    min-width: 140px;
+    border-radius: 999px;
+    padding: 10px 16px;
+    font-weight: 700;
+    background: #ffffff;
+    border: 1px solid rgba(0,0,0,0.08);
+  }
+
+  .menu button.active {
+    background: linear-gradient(135deg, #ffefef, #ffd9d9);
+    border-color: rgba(192,18,35,0.35);
+    color: #b00f1f;
+    box-shadow: 0 10px 22px rgba(0,0,0,0.12);
+  }
+
+  .exporter {
+    margin: 10px auto 0;
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+  }
+
+  .importer-input {
+    display: none;
+  }
+
+  .importer-label {
+    display: inline-block;
+    padding: 10px 16px;
+    border-radius: 999px;
+    background: #ffffff;
+    border: 1px solid rgba(0,0,0,0.08);
+    cursor: pointer;
+    font-weight: 700;
+    box-shadow: 0 8px 18px rgba(0,0,0,0.1);
+  }
+
+  .numeric {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+
+  .numeric.visible { display: flex; }
+
+  .numero-input {
+    display: flex;
+    gap: 12px;
+  }
+
+  .digit-box {
+    width: 44px;
+    height: 54px;
+    border-radius: 10px;
+    background: #ffffff;
+    border: 1px solid rgba(0,0,0,0.08);
+    box-shadow: 0 8px 18px rgba(0,0,0,0.1);
+    font-size: 26px;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .clavier {
+    display: grid;
+    grid-template-columns: repeat(3, 70px);
+    gap: 8px;
+  }
+
+  .clavier button {
+    padding: 14px;
+    font-size: 18px;
+    border-radius: 12px;
+  }
+
+  .reponses {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    align-items: center;
+    margin-top: 10px;
+  }
+
+  .reponse-bonne {
+    color: #0b7c2f;
+    font-weight: 700;
+  }
+
+  .reponse-mauvaise {
+    color: #b21b1b;
+    font-weight: 700;
+  }
+
+  .overlay-correction {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 96px;
+    font-weight: 900;
+    color: #b30000;
+    text-shadow: 0 4px 18px rgba(0,0,0,0.45);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 160ms ease;
+    z-index: 1500;
+  }
+
+  .overlay-correction.visible {
+    opacity: 1;
+  }
+
+  .stage-message {
+    position: fixed;
+    top: 18%;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 14px 20px;
+    background: rgba(255,255,255,0.96);
+    border-radius: 12px;
+    border: 1px solid rgba(0,0,0,0.08);
+    box-shadow: 0 12px 28px rgba(0,0,0,0.18);
+    font-weight: 800;
+    font-size: 16px;
+    z-index: 1800;
+    opacity: 0;
+    transition: opacity 180ms ease;
+    pointer-events: none;
+  }
+
+  .stage-message.visible {
+    opacity: 1;
+  }
+
+  #confetti {
+    pointer-events: none;
+    position: fixed;
+    inset: 0;
+    overflow: hidden;
+    z-index: 1700;
+  }
+
+  .confetti-piece {
+    position: absolute;
+    width: 10px;
+    height: 18px;
+    border-radius: 3px;
+    opacity: 0.9;
+    animation: confetti-fall 1.6s linear forwards;
+  }
+
+  @keyframes confetti-fall {
+    0% { transform: translateY(-20px) rotate(0deg); }
+    100% { transform: translateY(110vh) rotate(360deg); }
+  }
+
+  .training {
+    display: none;
+    margin: 20px auto;
+    max-width: 640px;
+    text-align: left;
+  }
+
+  .training.visible {
+    display: block;
+  }
+
+  .training table {
+    width: 100%;
+    border-collapse: collapse;
+    background: #ffffff;
+    border: 1px solid rgba(0,0,0,0.08);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 12px 24px rgba(0,0,0,0.12);
+  }
+
+  .training th, .training td {
+    padding: 10px 12px;
+    font-size: 13px;
+    border-bottom: 1px solid rgba(0,0,0,0.06);
+  }
+
+  .training th {
+    background: #f7f7f7;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+  }
+
+  .training tr:last-child td {
+    border-bottom: none;
+  }
+
+  .training .score-low {
+    color: #b00020;
+    font-weight: 700;
+  }
+
+  .training .score-mid {
+    color: #c06700;
+    font-weight: 700;
+  }
+
+  .training .score-high {
+    color: #0b7c2f;
+    font-weight: 700;
+  }
+
+  .ligne {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+
+  #valeurs {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 24px;
+  }
+
+  .valeurs-ligne {
+    display: flex;
+    gap: 8px;
+  }
+
+  button {
+    padding: 12px 16px;
+    font-size: 15px;
+    border-radius: 6px;
+    border: 1px solid rgba(0,0,0,0.08);
+    background: #ffffff;
+    color: #0e0e0e;
+    cursor: pointer;
+    transition: transform 120ms ease, box-shadow 120ms ease;
+  }
+
+  button:hover {
+    background: #f0f0f0;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+    transform: translateY(-1px);
+  }
+
+  .suit {
+    min-width: 140px;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    letter-spacing: 0.4px;
+    box-shadow: 0 10px 22px rgba(0,0,0,0.12);
+    border: none;
+  }
+
+  .suit::before {
+    content: attr(data-symbole);
+    font-size: 18px;
+  }
+
+  .suit-pique { background: linear-gradient(145deg, #fefefe, #e8e8e8); color: #0d0d0d; }
+  .suit-trefle { background: linear-gradient(145deg, #fefefe, #e8e8e8); color: #0d0d0d; }
+  .suit-coeur { background: linear-gradient(145deg, #fff1f3, #ffd9df); color: #c01223; }
+  .suit-carreau { background: linear-gradient(145deg, #fff1f3, #ffd9df); color: #c01223; }
+
+  #feedback {
+    min-height: 26px;
+    font-size: 18px;
+    margin-top: 20px;
+  }
+
+  #stats {
+    margin-top: 25px;
+    font-size: 13px;
+    opacity: 0.6;
+  }
+
+  .carte {
+    width: 170px;
+    height: 250px;
+    margin: 24px auto 60px;
+    border-radius: 14px;
+    background: url("Back.jpg") center/cover no-repeat;
+    box-shadow: 0 10px 24px rgba(0,0,0,0.16);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    color: #fff;
+    text-shadow: 0 2px 6px rgba(0,0,0,0.5);
+    user-select: none;
+    overflow: hidden;
+  }
+
+  .carte-face {
+    position: absolute;
+    inset: 6px;
+    width: calc(100% - 12px);
+    height: calc(100% - 12px);
+    object-fit: contain;
+    border-radius: 10px;
+    display: none;
+    box-shadow: inset 0 0 0 1px rgba(0,0,0,0.08);
+    background: #ffffff;
+  }
+
+  .carte-face.visible {
+    display: block;
+  }
+
+  .carte::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.28), transparent 40%),
+                radial-gradient(circle at 70% 70%, rgba(255,255,255,0.22), transparent 42%),
+                linear-gradient(135deg, rgba(0,0,0,0.18), rgba(0,0,0,0));
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  #numero {
+    font-size: 64px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    position: relative;
+    z-index: 2;
+    color: #0d0d0d;
+    text-shadow: 0 1px 2px rgba(255,255,255,0.65);
+  }
+
+  .flash {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 120ms ease;
+    z-index: 0;
+  }
+
+  .flash.good {
+    background: rgba(0, 180, 80, 0.25);
+    z-index: 0;
+  }
+
+  .flash.bad {
+    background: rgba(220, 40, 40, 0.25);
+    z-index: 2000;
+  }
+
+  .flash.visible {
+    opacity: 1;
+  }
+</style>
+</head>
+
+<body>
+
+<div id="flash" class="flash"></div>
+<div id="overlay-correction" class="overlay-correction"></div>
+<div id="confetti"></div>
+<div id="stage-message" class="stage-message"></div>
+
+<button id="burger" class="burger" aria-expanded="false" aria-label="Ouvrir le menu">☰</button>
+
+<h1>Mémoire des cartes — ordre personnel</h1>
+
+<div id="menu-panel" class="menu-panel hidden">
+  <div id="menu" class="menu"></div>
+ </div>
+
+<div class="exporter">
+  <button id="exporter">Exporter la progression</button>
+  <label for="importer" class="importer-label">Importer</label>
+  <input id="importer" type="file" accept="application/json" class="importer-input" />
+  <button id="reset">Reset memory</button>
+</div>
+
+<div id="carte" class="carte" aria-label="Carte">
+  <img id="carte-face" class="carte-face" alt="" />
+  <div id="numero">–</div>
+</div>
+
+<div id="numeric-zone" class="numeric">
+  <div id="numero-input" class="numero-input">
+    <span class="digit-box" data-idx="0">–</span>
+    <span class="digit-box" data-idx="1">–</span>
+  </div>
+  <div id="clavier" class="clavier"></div>
+</div>
+
+<div class="ligne" id="valeurs"></div>
+<div class="ligne" id="couleurs"></div>
+
+<div id="training" class="training"></div>
+
+<div id="feedback"></div>
+<div id="reponses" class="reponses"></div>
+<div id="stats"></div>
+
+<script>
+/* ============================
+   DONNÉES – ORDRE FIXE
+============================ */
+
+const ORDERED_CARDS = [
+  "4 de Trèfle","2 de Cœur","7 de Carreau","3 de Trèfle","4 de Cœur","6 de Carreau",
+  "As de Pique","5 de Cœur","9 de Pique","2 de Pique","Dame de Cœur","3 de Carreau",
+  "Dame de Trèfle","8 de Cœur","6 de Pique","5 de Pique","9 de Cœur","Roi de Trèfle",
+  "2 de Carreau","Valet de Cœur","3 de Pique","8 de Pique","6 de Cœur","10 de Trèfle",
+  "5 de Carreau","Roi de Carreau","2 de Trèfle","3 de Cœur","8 de Carreau","5 de Trèfle",
+  "Roi de Pique","Valet de Carreau","8 de Trèfle","10 de Pique","Roi de Cœur",
+  "Valet de Trèfle","7 de Pique","10 de Cœur","As de Carreau","4 de Pique",
+  "7 de Cœur","4 de Carreau","As de Trèfle","9 de Trèfle","Valet de Pique",
+  "Dame de Carreau","7 de Trèfle","Dame de Pique","10 de Carreau","6 de Trèfle",
+  "As de Cœur","9 de Carreau"
+]
+
+const VALEURS = ["As","2","3","4","5","6","7","8","9","10","Valet","Dame","Roi"]
+const VALEUR_GROUPES = [
+  ["As","2","3","4","5"],
+  ["6","7","8","9","10"],
+  ["Valet","Dame","Roi"]
+]
+const COULEURS = ["Pique","Cœur","Trèfle","Carreau"]
+const SUIT_SYMBOLS = { Pique: "♠", Cœur: "♥", Trèfle: "♣", Carreau: "♦" }
+const SUIT_CLASSES = { Pique: "pique", Cœur: "coeur", Trèfle: "trefle", Carreau: "carreau" }
+const MODES = ["Dos","Face","Mixte","Training"]
+const STATS_VERSION = "v2"
+const STAGES = (() => {
+  const res = []
+  const max = ORDERED_CARDS.length
+  // 1-5, 6-10, 1-10, 11-15, 1-15, 16-20, 1-20, ... jusqu'à max
+  res.push({ start: 1, end: Math.min(5, max), label: `1-${Math.min(5, max)}` })
+  for (let start = 6; start <= max; start += 5) {
+    const end = Math.min(start + 4, max)
+    res.push({ start, end, label: `${start}-${end}` })
+    if (end > 5) res.push({ start: 1, end, label: `1-${end}` })
+  }
+  if (res[res.length - 1]?.end !== max) {
+    res.push({ start: 1, end: max, label: `1-${max}` })
+  }
+  return res
+})()
+
+const STORAGE_KEY = "memo_cartes_v1"
+const FAST = 800
+const SLOW = 3000
+
+/* ============================
+   ÉTAT
+============================ */
+
+let cartes = []
+let carteActuelle = null
+let valeurChoisie = null
+let couleurChoisie = null
+let debutTemps = 0
+let modeActuel = "Face"
+let menuOuvert = false
+let menuTimeout = null
+let questionMode = "Face"
+let digits = []
+let stageParMode = { dos: 0, face: 0 }
+let derniereCarte = null
+let stageAckHandler = null
+
+function cheminCarte(carte) {
+  const suitMap = {
+    "Pique": "spades",
+    "Cœur": "hearts",
+    "Trèfle": "clubs",
+    "Carreau": "diamonds"
+  }
+  const valeurMap = {
+    "As": "ace",
+    "Valet": "jack",
+    "Dame": "queen",
+    "Roi": "king"
+  }
+  const suit = suitMap[carte.couleur]
+  if (!suit) return null
+  const valKey = valeurMap[carte.valeur] || carte.valeur
+  let file = `${valKey}_of_${suit}`
+  if (valKey === "jack" || (valKey === "king" && suit !== "spades")) {
+    file += "2"
+  }
+  return `CARDS/${file}.png`
+}
+
+/* ============================
+   INITIALISATION
+============================ */
+
+function statsVides() {
+  return {
+    points: 0,
+    vues: 0,
+    succes: 0,
+    echecs: 0,
+    serie: 0,
+    maitrise: 0,
+    tempsMoyen: null,
+    poids: 1
+  }
+}
+
+function creerDeck() {
+  cartes = ORDERED_CARDS.map((label, index) => {
+    const [valeur, , couleur] = label.split(" ")
+    return {
+      id: label.replaceAll(" ", "_"),
+      valeur,
+      couleur,
+      numero: index + 1,
+      version: STATS_VERSION,
+      stats: {
+        dos: statsVides(),
+        face: statsVides()
+      }
+    }
+  })
+}
+
+function charger() {
+  const saved = localStorage.getItem(STORAGE_KEY)
+  if (saved) {
+    const data = JSON.parse(saved)
+    const sauvegarde = Array.isArray(data)
+      ? { cartes: data, stageParMode: { dos: 0, face: 0 } } // ancienne forme
+      : data
+
+    if (Array.isArray(sauvegarde.cartes)) {
+      cartes = sauvegarde.cartes.map(c => {
+        if (c.stats && c.stats.dos && c.stats.face) return c
+        // migration ancien format
+        const baseStats = statsVides()
+        if (c.vues !== undefined) {
+          baseStats.vues = c.vues
+          baseStats.succes = c.succes
+          baseStats.echecs = c.echecs
+          baseStats.serie = c.serie
+          baseStats.maitrise = c.maitrise
+          baseStats.tempsMoyen = c.tempsMoyen
+          baseStats.poids = c.poids
+        }
+        return {
+          id: c.id,
+          valeur: c.valeur,
+          couleur: c.couleur,
+          numero: c.numero,
+          version: STATS_VERSION,
+          stats: {
+            dos: { ...statsVides(), ...baseStats },
+            face: statsVides()
+          }
+        }
+      })
+    } else {
+      creerDeck()
+    }
+
+    if (sauvegarde.stageParMode) {
+      stageParMode = {
+        dos: Math.min(sauvegarde.stageParMode.dos ?? 0, STAGES.length - 1),
+        face: Math.min(sauvegarde.stageParMode.face ?? 0, STAGES.length - 1)
+      }
+    }
+  } else {
+    creerDeck()
+  }
+}
+
+function sauvegarder() {
+  const data = {
+    version: STATS_VERSION,
+    cartes,
+    stageParMode
+  }
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
+}
+
+/* ============================
+   LOGIQUE
+============================ */
+
+function scoreTemps(ms) {
+  if (ms <= FAST) return 1
+  if (ms >= SLOW) return 0
+  return 1 - (ms - FAST) / (SLOW - FAST)
+}
+
+function calculPoids(stats) {
+  let p = 1
+  p += stats.echecs * 2
+  if (stats.maitrise < 0.5) p += 2
+  if (stats.maitrise < 0.3) p += 4
+  if (stats.maitrise > 0.8 && stats.serie >= 3) p *= 0.3
+  if (stats.maitrise > 0.9 && stats.serie >= 5) p *= 0.1
+  // plus de poids quand les points sont bas
+  p += Math.max(0, (8 - (stats.points || 0)) * 0.6)
+  return Math.max(0.05, p)
+}
+
+function tirerCarte(mode) {
+  const key = mode.toLowerCase()
+  const range = STAGES[stageParMode[key]] || STAGES[STAGES.length - 1]
+  const subset = cartes.filter(c => c.numero >= range.start && c.numero <= range.end)
+  if (subset.length === 0) return cartes[0]
+
+  const minPoints = Math.min(...subset.map(c => c.stats[key]?.points ?? 0))
+  let candidats = subset.filter(c => (c.stats[key]?.points ?? 0) === minPoints)
+
+  const minVues = Math.min(...candidats.map(c => c.stats[key]?.vues ?? 0))
+  const candidatsVues = candidats.filter(c => (c.stats[key]?.vues ?? 0) === minVues)
+  if (candidatsVues.length > 0) candidats = candidatsVues
+
+  return candidats[Math.floor(Math.random() * candidats.length)]
+}
+
+function majCarte(carte, mode, bon, temps) {
+  const stats = carte.stats[mode.toLowerCase()]
+  if (!stats) return
+  stats.vues++
+  stats.points = (stats.points || 0) + (bon ? 1 : -1)
+  if (bon) {
+    stats.succes++
+    stats.serie++
+  } else {
+    stats.echecs++
+    stats.serie = 0
+  }
+
+  const alpha = 0.3
+  stats.tempsMoyen = stats.tempsMoyen
+    ? stats.tempsMoyen * (1 - alpha) + temps * alpha
+    : temps
+
+  const score = bon ? scoreTemps(temps) : 0
+  stats.maitrise = stats.maitrise
+    ? stats.maitrise * 0.8 + score * 0.2
+    : score
+
+  stats.poids = calculPoids(stats)
+}
+
+function verifierPalier(mode) {
+  const key = mode.toLowerCase()
+  const idx = stageParMode[key]
+  const range = STAGES[idx] || STAGES[STAGES.length - 1]
+  const subset = cartes.filter(c => c.numero >= range.start && c.numero <= range.end)
+  const seuil = 5
+  const complet = subset.every(c => (c.stats[key].points || 0) >= seuil)
+  if (complet && idx < STAGES.length - 1) {
+    stageParMode[key] = idx + 1
+    sauvegarder()
+    const prochain = STAGES[stageParMode[key]]
+    showStageMessage(`Palier ${range.label} terminé (${mode}) → ${prochain.label}`)
+    lancerConfetti()
+    majStats()
+  }
+}
+
+/* ============================
+   INTERFACE
+============================ */
+
+function afficherBoutons() {
+  const v = document.getElementById("valeurs")
+  const c = document.getElementById("couleurs")
+  const menu = document.getElementById("menu")
+  const clavier = document.getElementById("clavier")
+  const training = document.getElementById("training")
+  v.innerHTML = ""
+  c.innerHTML = ""
+  menu.innerHTML = ""
+  clavier.innerHTML = ""
+  training.innerHTML = ""
+
+  MODES.forEach(m => {
+    const b = document.createElement("button")
+    b.textContent = m
+    b.classList.toggle("active", m === modeActuel)
+    b.onclick = (ev) => {
+      ev.stopPropagation()
+      modeActuel = m
+      setMenu(false)
+      afficherBoutons()
+      if (modeActuel !== "Training") {
+        prochaineCarte()
+      }
+    }
+    menu.appendChild(b)
+  })
+
+  const showTraining = modeActuel === "Training"
+  document.getElementById("numeric-zone").style.display = showTraining ? "none" : "flex"
+  document.getElementById("valeurs").style.display = showTraining ? "none" : "flex"
+  document.getElementById("couleurs").style.display = showTraining ? "none" : "flex"
+  document.getElementById("carte").style.display = showTraining ? "none" : "flex"
+  training.classList.toggle("visible", showTraining)
+
+  if (showTraining) {
+    renderTraining()
+    return
+  }
+
+  VALEUR_GROUPES.forEach(groupe => {
+    const ligne = document.createElement("div")
+    ligne.classList.add("valeurs-ligne")
+    groupe.forEach(val => {
+      const b = document.createElement("button")
+      b.textContent = val
+      b.onclick = () => { valeurChoisie = val; tenterValidation() }
+      ligne.appendChild(b)
+    })
+    v.appendChild(ligne)
+  })
+
+  COULEURS.forEach(col => {
+    const b = document.createElement("button")
+    b.textContent = col
+    b.onclick = () => { couleurChoisie = col; tenterValidation() }
+    b.classList.add("suit")
+    b.classList.add(`suit-${SUIT_CLASSES[col]}`)
+    b.dataset.symbole = SUIT_SYMBOLS[col]
+    c.appendChild(b)
+  })
+
+  ;[1,2,3,4,5,6,7,8,9,0,"⌫","OK"].forEach(val => {
+    const b = document.createElement("button")
+    b.textContent = val
+    b.onclick = () => gererClavier(val)
+    clavier.appendChild(b)
+  })
+}
+
+function majAffichageDigits() {
+  const boxes = document.querySelectorAll(".digit-box")
+  boxes.forEach((box, idx) => {
+    box.textContent = digits[idx] !== undefined ? digits[idx] : "–"
+  })
+}
+
+function gererClavier(val) {
+  if (val === "⌫") {
+    digits.pop()
+    majAffichageDigits()
+    return
+  }
+  if (val === "OK") {
+    tenterValidation()
+    return
+  }
+  if (typeof val === "number") {
+    if (digits.length >= 2) return
+    digits.push(val)
+    majAffichageDigits()
+  }
+}
+
+function majStats() {
+  if (!carteActuelle) return
+  const displayMode = modeActuel === "Mixte" ? "Mixte" : questionMode
+  const modeKey = (modeActuel === "Mixte" ? questionMode : modeActuel).toLowerCase()
+  const stats = carteActuelle.stats[modeKey]
+  if (!stats) return
+  const palier = STAGES[stageParMode[modeKey]] || STAGES[STAGES.length - 1]
+  document.getElementById("stats").textContent =
+    `Mode ${displayMode} · Palier ${palier.label} · Points : ${stats.points} · Maîtrise : ${(stats.maitrise * 100).toFixed(0)} % · Poids : ${stats.poids.toFixed(2)}`
+}
+
+function renderTraining() {
+  const training = document.getElementById("training")
+  const faceStage = STAGES[stageParMode.face] || STAGES[STAGES.length - 1]
+  const subset = cartes.filter(c => c.numero >= faceStage.start && c.numero <= faceStage.end)
+  const sorted = subset
+    .map(c => ({
+      carte: c,
+      facePts: c.stats.face.points || 0,
+      dosPts: c.stats.dos.points || 0,
+      total: (c.stats.face.points || 0) + (c.stats.dos.points || 0)
+    }))
+    .sort((a, b) => a.total - b.total || a.carte.numero - b.carte.numero)
+
+  const rows = sorted.map(item => {
+    const cls = item.total <= 2 ? "score-low" : item.total < 8 ? "score-mid" : "score-high"
+    return `
+      <tr>
+        <td>${item.carte.numero}</td>
+        <td>${item.carte.valeur} de ${item.carte.couleur}</td>
+        <td class="${cls}">${item.total}</td>
+        <td>${item.facePts}</td>
+        <td>${item.dosPts}</td>
+      </tr>
+    `
+  }).join("")
+
+  training.innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Carte</th>
+          <th>Total pts</th>
+          <th>Face</th>
+          <th>Dos</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `
+}
+
+function setMenu(open) {
+  const panel = document.getElementById("menu-panel")
+  const burger = document.getElementById("burger")
+  menuOuvert = open
+  if (menuOuvert) {
+    panel.classList.remove("hidden")
+    burger.setAttribute("aria-expanded", "true")
+    clearTimeout(menuTimeout)
+    menuTimeout = setTimeout(() => setMenu(false), 5000)
+  } else {
+    panel.classList.add("hidden")
+    burger.setAttribute("aria-expanded", "false")
+    clearTimeout(menuTimeout)
+    menuTimeout = null
+  }
+}
+
+function afficherCarte() {
+  if (modeActuel === "Training") return
+  const numeroEl = document.getElementById("numero")
+  const zoneNumeric = document.getElementById("numeric-zone")
+  const zoneValeurs = document.getElementById("valeurs")
+  const zoneCouleurs = document.getElementById("couleurs")
+  const carteEl = document.getElementById("carte")
+  const faceImg = document.getElementById("carte-face")
+
+  if (questionMode === "Dos") {
+    zoneNumeric.style.display = "none"
+    carteEl.style.background = 'url("Back.jpg") center/cover no-repeat'
+    faceImg.classList.remove("visible")
+    faceImg.removeAttribute("src")
+    numeroEl.textContent = carteActuelle.numero
+    zoneNumeric.classList.remove("visible")
+    zoneValeurs.style.display = "flex"
+    zoneCouleurs.style.display = "flex"
+  } else {
+    zoneNumeric.style.display = "flex"
+    const symbole = SUIT_SYMBOLS[carteActuelle.couleur] || carteActuelle.couleur
+    const src = cheminCarte(carteActuelle)
+    if (src) {
+      faceImg.src = src
+      faceImg.alt = `${carteActuelle.valeur} de ${carteActuelle.couleur}`
+      faceImg.classList.add("visible")
+      carteEl.style.background = "#ffffff"
+      numeroEl.textContent = ""
+    } else {
+      faceImg.classList.remove("visible")
+      numeroEl.textContent = `${carteActuelle.valeur} ${symbole}`
+      carteEl.style.background = "#ffffff"
+    }
+    zoneNumeric.classList.add("visible")
+    zoneValeurs.style.display = "none"
+    zoneCouleurs.style.display = "none"
+  }
+
+  document.getElementById("feedback").textContent = ""
+  document.getElementById("reponses").innerHTML = ""
+  const correction = document.getElementById("overlay-correction")
+  correction.classList.remove("visible")
+  correction.textContent = ""
+  document.getElementById("stage-message").classList.remove("visible")
+  valeurChoisie = null
+  couleurChoisie = null
+  digits = []
+  majAffichageDigits()
+  majStats()
+  debutTemps = performance.now()
+}
+
+function tenterValidation() {
+  if (questionMode === "Dos" && (!valeurChoisie || !couleurChoisie)) return
+  if (questionMode === "Face" && digits.length === 0) return
+
+  const temps = performance.now() - debutTemps
+  let bon = false
+  let reponse
+
+  if (questionMode === "Dos") {
+    bon =
+      valeurChoisie === carteActuelle.valeur &&
+      couleurChoisie === carteActuelle.couleur
+    reponse = `${valeurChoisie || ""} de ${couleurChoisie || ""}`
+  } else {
+    const num = parseInt(digits.join(""), 10)
+    reponse = `#${isNaN(num) ? "?" : num}`
+    bon = num === carteActuelle.numero
+  }
+
+  majCarte(carteActuelle, questionMode, bon, temps)
+  sauvegarder()
+
+  document.getElementById("feedback").textContent =
+    bon
+      ? `✔ ${carteActuelle.valeur} de ${carteActuelle.couleur} (${Math.round(temps)} ms)`
+      : `✘ ${carteActuelle.valeur} de ${carteActuelle.couleur}`
+
+  if (!bon) {
+    const correction = document.getElementById("overlay-correction")
+    correction.textContent = carteActuelle.numero
+    correction.classList.add("visible")
+  }
+
+  majStats()
+
+  verifierPalier(questionMode)
+  const flash = document.getElementById("flash")
+  flash.className = `flash ${bon ? "good" : "bad"} visible`
+  if (bon) {
+    setTimeout(() => {
+      flash.classList.remove("visible")
+      prochaineCarte()
+    }, 320)
+  } else {
+    const handler = () => {
+      flash.classList.remove("visible")
+      document.getElementById("overlay-correction").classList.remove("visible")
+      document.removeEventListener("click", handler, true)
+      prochaineCarte()
+    }
+    document.addEventListener("click", handler, true)
+  }
+}
+
+function prochaineCarte() {
+  if (modeActuel === "Training") {
+    renderTraining()
+    return
+  }
+  questionMode =
+    modeActuel === "Mixte"
+      ? (Math.random() < 0.5 ? "Dos" : "Face")
+      : (modeActuel === "Entrainement" ? "Dos" : modeActuel)
+  let tentative = 0
+  do {
+    carteActuelle = tirerCarte(questionMode)
+    tentative++
+  } while (derniereCarte && carteActuelle && carteActuelle.id === derniereCarte.id && tentative < 5)
+  derniereCarte = carteActuelle
+  afficherCarte()
+}
+
+function lancerConfetti() {
+  const container = document.getElementById("confetti")
+  container.innerHTML = ""
+  const couleurs = ["#ff3b30", "#ffcc00", "#34c759", "#007aff", "#af52de"]
+  for (let i = 0; i < 120; i++) {
+    const piece = document.createElement("div")
+    piece.className = "confetti-piece"
+    piece.style.left = Math.random() * 100 + "vw"
+    piece.style.animationDuration = (1.8 + Math.random() * 1.4).toFixed(2) + "s"
+    piece.style.animationDelay = (Math.random() * 0.6).toFixed(2) + "s"
+    piece.style.background = couleurs[Math.floor(Math.random() * couleurs.length)]
+    container.appendChild(piece)
+  }
+  setTimeout(() => { container.innerHTML = "" }, 5000)
+}
+
+function showStageMessage(msg) {
+  const el = document.getElementById("stage-message")
+  el.textContent = msg
+  el.classList.add("visible")
+  if (stageAckHandler) {
+    document.removeEventListener("click", stageAckHandler, true)
+    stageAckHandler = null
+  }
+  stageAckHandler = () => {
+    el.classList.remove("visible")
+    document.getElementById("confetti").innerHTML = ""
+    document.removeEventListener("click", stageAckHandler, true)
+    stageAckHandler = null
+  }
+  document.addEventListener("click", stageAckHandler, true)
+}
+
+function exporterPoints() {
+  const payload = cartes.map(c => ({
+    id: c.id,
+    numero: c.numero,
+    valeur: c.valeur,
+    couleur: c.couleur,
+    dos: { points: c.stats.dos.points, maitrise: c.stats.dos.maitrise, tempsMoyen: c.stats.dos.tempsMoyen },
+    face: { points: c.stats.face.points, maitrise: c.stats.face.maitrise, tempsMoyen: c.stats.face.tempsMoyen }
+  }))
+  const blob = new Blob([JSON.stringify({ cartes: payload, stageParMode }, null, 2)], { type: "application/json" })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement("a")
+  a.href = url
+  a.download = "points-cartes.json"
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+function handleImport(ev) {
+  const file = ev.target.files?.[0]
+  if (!file) return
+  const reader = new FileReader()
+  reader.onload = () => {
+    try {
+      const data = JSON.parse(reader.result)
+      if (Array.isArray(data.cartes)) {
+        // compat ancien export (tableau simple)
+        const payload = data.cartes
+        cartes.forEach(c => {
+          const found = payload.find(p => p.id === c.id)
+          if (found) {
+            c.stats.dos.points = found.dos?.points || 0
+            c.stats.dos.maitrise = found.dos?.maitrise || 0
+            c.stats.dos.tempsMoyen = found.dos?.tempsMoyen || null
+            c.stats.face.points = found.face?.points || 0
+            c.stats.face.maitrise = found.face?.maitrise || 0
+            c.stats.face.tempsMoyen = found.face?.tempsMoyen || null
+            c.stats.dos.poids = calculPoids(c.stats.dos)
+            c.stats.face.poids = calculPoids(c.stats.face)
+          }
+        })
+      } else if (Array.isArray(data)) {
+        // très ancien format tableau simple sans clé cartes
+        data.forEach(p => {
+          const found = cartes.find(c => c.id === p.id)
+          if (found) {
+            found.stats.dos.points = p.points || 0
+            found.stats.dos.maitrise = p.maitrise || 0
+            found.stats.dos.tempsMoyen = p.tempsMoyen || null
+            found.stats.dos.poids = calculPoids(found.stats.dos)
+          }
+        })
+      }
+      if (data.stageParMode) {
+        stageParMode = {
+          dos: Math.min(data.stageParMode.dos ?? 0, STAGES.length - 1),
+          face: Math.min(data.stageParMode.face ?? 0, STAGES.length - 1)
+        }
+      }
+      sauvegarder()
+      afficherBoutons()
+      prochaineCarte()
+    } catch (err) {
+      console.error("Import invalide", err)
+    } finally {
+      ev.target.value = ""
+    }
+  }
+  reader.readAsText(file)
+}
+
+function resetProgression() {
+  creerDeck()
+  stageParMode = { dos: 0, face: 0 }
+  sauvegarder()
+  afficherBoutons()
+  prochaineCarte()
+}
+
+/* ============================
+   LANCEMENT
+============================ */
+
+const burgerBtn = document.getElementById("burger")
+const menuPanel = document.getElementById("menu-panel")
+const exporterBtn = document.getElementById("exporter")
+const importerInput = document.getElementById("importer")
+const resetBtn = document.getElementById("reset")
+burgerBtn.addEventListener("click", (e) => { e.stopPropagation(); setMenu(!menuOuvert) })
+menuPanel.addEventListener("click", (e) => e.stopPropagation())
+document.addEventListener("click", () => setMenu(false))
+exporterBtn.addEventListener("click", (e) => { e.stopPropagation(); exporterPoints() })
+importerInput.addEventListener("change", handleImport)
+resetBtn.addEventListener("click", (e) => { e.stopPropagation(); resetProgression() })
+setMenu(false)
+
+charger()
+afficherBoutons()
+prochaineCarte()
+</script>
+
+</body>
+</html>
