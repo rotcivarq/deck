@@ -715,12 +715,6 @@ function verifierPalier(mode) {
         const st = c.stats[key]
         if (!st) return
         st.points = 0
-        st.vues = 0
-        st.succes = 0
-        st.echecs = 0
-        st.serie = 0
-        st.maitrise = 0
-        st.tempsMoyen = null
         st.poids = calculPoids(st)
       })
     }
