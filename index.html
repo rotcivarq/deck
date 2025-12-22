@@ -1031,6 +1031,7 @@ function tenterValidation() {
     if (!queueErreurs.some(c => c.id === carteActuelle.id)) {
       queueErreurs.push(carteActuelle)
     }
+    phase = "errors"
   }
 
   document.getElementById("feedback").textContent =
