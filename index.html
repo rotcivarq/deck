@@ -1154,8 +1154,14 @@ function showStageMessage(msg) {
 }
 
 function resetProgression() {
-  creerDeck()
-  stageParMode = { dos: 0, face: 0 }
+  const modeKey = (modeActuel === "Mixte" ? questionMode : modeActuel).toLowerCase()
+  cartes.forEach(c => {
+    const st = c.stats[modeKey]
+    if (!st) return
+    st.points = 0
+    st.poids = calculPoids(st)
+  })
+  resetCycle()
   sauvegarder()
   afficherBoutons()
   prochaineCarte()
