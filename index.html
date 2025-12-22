@@ -707,9 +707,23 @@ function verifierPalier(mode) {
   const complet = subset.every(c => (c.stats[key].points || 0) >= seuil)
   if (complet && idx < STAGES.length - 1) {
     stageParMode[key] = idx + 1
+    const prochain = STAGES[stageParMode[key]]
+    if (prochain.start === 1) {
+      cartes.forEach(c => {
+        const st = c.stats[key]
+        if (!st) return
+        st.points = 0
+        st.vues = 0
+        st.succes = 0
+        st.echecs = 0
+        st.serie = 0
+        st.maitrise = 0
+        st.tempsMoyen = null
+        st.poids = calculPoids(st)
+      })
+    }
     stagePending = true
     sauvegarder()
-    const prochain = STAGES[stageParMode[key]]
     showStageMessage(`Palier ${range.label} terminé (${mode}) → ${prochain.label}`)
     lancerConfetti()
     majStats()
