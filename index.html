@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 <title>Memories</title>
 
 <style>
@@ -13,6 +13,7 @@
     background: #f7f7f7;
     color: #0e0e0e;
     text-align: center;
+    touch-action: manipulation;
   }
 
   h1 {
@@ -287,6 +288,7 @@
     color: #0e0e0e;
     cursor: pointer;
     transition: transform 120ms ease, box-shadow 120ms ease;
+    touch-action: manipulation;
   }
 
   button:hover {
