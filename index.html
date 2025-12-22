@@ -1099,14 +1099,11 @@ function prochaineCarte() {
           queueCartes = []
           break
         }
-      } else if (errorsThisRound.size > 0) {
-        queueType = "errors"
-        queueCartes = shuffle(pool.filter(c => errorsThisRound.has(c.id)))
-        errorsThisRound.clear()
-        break
       } else {
-        queueType = "full"
-        queueCartes = shuffle([...pool])
+        // lancer un rattrapage sur toutes les cartes sous seuil
+        queueType = "errors"
+        queueCartes = shuffle(pool.filter(c => (c.stats[modeKey]?.points ?? 0) < seuil))
+        errorsThisRound.clear()
         break
       }
     } else { // queueType errors
@@ -1116,8 +1113,7 @@ function prochaineCarte() {
         queueCartes = shuffle([...pool])
         break
       } else {
-        queueType = "full"
-        queueCartes = shuffle([...pool])
+        queueCartes = shuffle(retard)
         break
       }
     }
