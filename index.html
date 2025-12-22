@@ -436,6 +436,7 @@
 <div id="menu-panel" class="menu-panel hidden">
   <div id="menu" class="menu"></div>
   <button id="reset" style="margin-top:8px; width:100%;">Reset memory</button>
+  <button id="reset-all" style="margin-top:6px; width:100%;">Full reset (palier 1)</button>
  </div>
 
 <div id="carte" class="carte" aria-label="Carte">
@@ -1185,6 +1186,26 @@ function resetProgression() {
   prochaineCarte()
 }
 
+function fullReset() {
+  stageParMode = { dos: 0, face: 0 }
+  cartes.forEach(c => {
+    Object.values(c.stats).forEach(st => {
+      st.points = 0
+      st.vues = 0
+      st.succes = 0
+      st.echecs = 0
+      st.serie = 0
+      st.maitrise = 0
+      st.tempsMoyen = null
+      st.poids = calculPoids(st)
+    })
+  })
+  resetCycle()
+  sauvegarder()
+  afficherBoutons()
+  prochaineCarte()
+}
+
 /* ============================
    LANCEMENT
 ============================ */
@@ -1192,10 +1213,12 @@ function resetProgression() {
 const burgerBtn = document.getElementById("burger")
 const menuPanel = document.getElementById("menu-panel")
 const resetBtn = document.getElementById("reset")
+const resetAllBtn = document.getElementById("reset-all")
 burgerBtn.addEventListener("click", (e) => { e.stopPropagation(); setMenu(!menuOuvert) })
 menuPanel.addEventListener("click", (e) => e.stopPropagation())
 document.addEventListener("click", () => setMenu(false))
 resetBtn.addEventListener("click", (e) => { e.stopPropagation(); resetProgression() })
+resetAllBtn.addEventListener("click", (e) => { e.stopPropagation(); fullReset() })
 setMenu(false)
 
 ensurePlayerId()
