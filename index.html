@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Mémoire des cartes</title>
+<title>Memories</title>
 
 <style>
   body {
@@ -171,8 +171,8 @@
     border-radius: 12px;
     border: 1px solid rgba(0,0,0,0.08);
     box-shadow: 0 12px 28px rgba(0,0,0,0.18);
-    font-weight: 800;
-    font-size: 16px;
+    font-weight: 900;
+    font-size: 22px;
     z-index: 1800;
     opacity: 0;
     transition: opacity 180ms ease;
@@ -417,10 +417,11 @@
 
 <button id="burger" class="burger" aria-expanded="false" aria-label="Ouvrir le menu">☰</button>
 
-<h1>Mémoire des cartes — ordre personnel</h1>
+<h1>Memories</h1>
 
 <div id="menu-panel" class="menu-panel hidden">
   <div id="menu" class="menu"></div>
+  <button id="reset" style="margin-top:8px; width:100%;">Reset memory</button>
  </div>
 
 <div id="carte" class="carte" aria-label="Carte">
@@ -1085,15 +1086,25 @@ function showStageMessage(msg) {
   document.addEventListener("click", stageAckHandler, true)
 }
 
+function resetProgression() {
+  creerDeck()
+  stageParMode = { dos: 0, face: 0 }
+  sauvegarder()
+  afficherBoutons()
+  prochaineCarte()
+}
+
 /* ============================
    LANCEMENT
 ============================ */
 
 const burgerBtn = document.getElementById("burger")
 const menuPanel = document.getElementById("menu-panel")
+const resetBtn = document.getElementById("reset")
 burgerBtn.addEventListener("click", (e) => { e.stopPropagation(); setMenu(!menuOuvert) })
 menuPanel.addEventListener("click", (e) => e.stopPropagation())
 document.addEventListener("click", () => setMenu(false))
+resetBtn.addEventListener("click", (e) => { e.stopPropagation(); resetProgression() })
 setMenu(false)
 
 ensurePlayerId()
