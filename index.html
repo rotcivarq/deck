@@ -537,6 +537,8 @@ let lastFullSummary = null
 let errorsThisRound = new Set()
 let queueType = "full" // "full" ou "errors"
 let tiragesDepuisQC = 0
+let roundOk = 0
+let roundFail = 0
 
 function cheminCarte(carte) {
   const suitMap = {
@@ -834,7 +836,7 @@ function majStats() {
     `Mode ${displayMode} · Niveau ${level} · Palier ${palier.label} · Points : ${stats.points} · Maîtrise : ${(stats.maitrise * 100).toFixed(0)} % · Poids : ${stats.poids.toFixed(2)}`
   const phaseLabel = queueType === "errors" ? "Rattrapage erreurs" : "Passe complète"
   const resume = lastFullSummary ? ` · Dernière passe : ${lastFullSummary.ok} réussies / ${lastFullSummary.fail} ratées` : ""
-  document.getElementById("phase").textContent = `Phase : ${phaseLabel}${resume}`
+  document.getElementById("phase").textContent = `Phase : ${phaseLabel}${resume} · Round : ${roundOk} OK / ${roundFail} KO`
 }
 
 function renderTraining() {
@@ -896,6 +898,8 @@ function resetCycle() {
   errorsThisRound = new Set()
   queueType = "full"
   tiragesDepuisQC = 0
+  roundOk = 0
+  roundFail = 0
   derniereCarte = null
 }
 
@@ -1038,6 +1042,8 @@ function tenterValidation() {
   if (!bon && queueType === "full") {
     errorsThisRound.add(carteActuelle.id)
   }
+  if (bon) roundOk++
+  else roundFail++
 
   document.getElementById("feedback").textContent =
     bon
@@ -1088,8 +1094,18 @@ function prochaineCarte() {
   const seuil = Math.min(4, thresholdParMode[modeKey] || 1)
   const pool = cartesDuPalier(questionMode)
 
+  // Premier tour d'un palier : jamais démarrer en rattrapage
+  if (!lastFullSummary) {
+    queueType = "full"
+    errorsThisRound.clear()
+    roundOk = 0
+    roundFail = 0
+  }
+
   while (queueCartes.length === 0) {
     if (queueType === "full") {
+      roundOk = 0
+      roundFail = 0
       const ok = pool.filter(c => (c.stats[modeKey]?.points ?? 0) >= seuil).length
       const fail = pool.length - ok
       lastFullSummary = { ok, fail }
@@ -1126,6 +1142,8 @@ function prochaineCarte() {
       } else {
         queueType = "errors"
         // pondération faibles/moyens/forts + QC
+        roundOk = 0
+        roundFail = 0
         const faibles = pool.filter(c => (c.stats[modeKey]?.points ?? 0) < seuil)
         const moyens = pool.filter(c => (c.stats[modeKey]?.points ?? 0) === seuil)
         const forts = pool.filter(c => (c.stats[modeKey]?.points ?? 0) > seuil)
@@ -1148,9 +1166,13 @@ function prochaineCarte() {
           thresholdParMode[modeKey] = seuil + 1
         }
         queueType = "full"
+        roundOk = 0
+        roundFail = 0
         queueCartes = shuffle([...pool])
         break
       } else {
+        roundOk = 0
+        roundFail = 0
         const forts = pool.filter(c => (c.stats[modeKey]?.points ?? 0) >= seuil)
         const list = []
         retard.forEach(c => { list.push(c, c, c) })
