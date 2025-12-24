@@ -1358,6 +1358,8 @@ function afficherCarte() {
   const zoneCouleurs = document.getElementById("couleurs")
   const carteEl = document.getElementById("carte")
   const faceImg = document.getElementById("carte-face")
+  faceImg.decoding = "async"
+  faceImg.loading = "eager"
 
   if (questionMode === "Dos") {
     zoneNumeric.style.display = "none"
@@ -1601,6 +1603,36 @@ function prochaineCarte() {
   questionCount++
   recentIds.push(chosen.id)
   if (recentIds.length > 3) recentIds.shift()
+
+  // Précharge la face de la prochaine carte potentielle (même pool, pire score) pour accélérer l'affichage
+  const faceImg = document.getElementById("carte-face")
+  const modeKeyNext = modeKey
+  const sortedPointsNext = sortedPoints
+  const poolNext = pool
+  const nowNext = questionCount
+  let candidate = null
+  for (const p of sortedPointsNext) {
+    const ready = (byPoint.get(p) || []).filter(e => (e.due ?? 0) <= nowNext && !recentIds.includes(e.card.id) && e.card.id !== carteActuelle.id)
+    if (ready.length) {
+      candidate = ready[0].card
+      break
+    }
+  }
+  if (!candidate) {
+    const worstScore = sortedPointsNext[0]
+    const worstList = (byPoint.get(worstScore) || []).filter(e => e.card.id !== carteActuelle.id)
+    if (worstList.length) candidate = worstList[0].card
+  }
+  if (candidate) {
+    const src = cheminCarte(candidate)
+    if (src) {
+      const img = new Image()
+      img.decoding = "async"
+      img.loading = "eager"
+      img.src = src
+    }
+  }
+
   afficherCarte()
 }
 
