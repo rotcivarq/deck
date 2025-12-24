@@ -399,9 +399,10 @@
 
   .chrono {
     position: fixed;
-    top: 70px;
-    left: 50%;
-    transform: translateX(-50%);
+    top: calc(16px + env(safe-area-inset-top, 0px));
+    right: 16px;
+    left: auto;
+    transform: none;
     font-size: 13px;
     font-family: "SFMono-Regular", Menlo, Consolas, monospace;
     font-feature-settings: "tnum";
@@ -696,7 +697,6 @@ function initChrono() {
   const timeLevel = timeLevelParMode[modeKey] || 0
   const timeGoal = (TIME_THRESHOLDS[timeLevel] ?? TIME_THRESHOLDS[TIME_THRESHOLDS.length - 1]) * 1000
   chronoEl.style.display = "block"
-  chronoStartAt = performance.now()
   const updateChrono = () => {
     const elapsed = performance.now() - chronoStartAt
     const secs = elapsed / 1000
@@ -713,11 +713,11 @@ function initChrono() {
       chronoEl.style.color = "#8a4f2c"
     }
   }
-  requestAnimationFrame(() => {
+  setTimeout(() => {
     chronoStartAt = performance.now()
     updateChrono()
     chronoInterval = setInterval(updateChrono, 50)
-  })
+  }, 500)
 }
 
 /* ============================
