@@ -337,6 +337,28 @@
     opacity: 0.7;
   }
 
+  .progress-container {
+    position: fixed;
+    top: 80px;
+    right: 10px;
+    width: 14px;
+    height: 60vh;
+    border-radius: 8px;
+    background: rgba(0,0,0,0.06);
+    overflow: hidden;
+    box-shadow: inset 0 0 0 1px rgba(0,0,0,0.05);
+    z-index: 5;
+  }
+
+  .progress-bar {
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(180deg, rgba(255,0,0,0.12), rgba(0,200,0,0.22));
+    transform-origin: bottom;
+    transform: scaleY(0);
+    transition: transform 200ms ease;
+  }
+
   .carte {
     width: 170px;
     height: 250px;
@@ -424,6 +446,7 @@
 <div id="stage-message" class="stage-message"></div>
 
 <button id="burger" class="burger" aria-expanded="false" aria-label="Ouvrir le menu">☰</button>
+<div class="progress-container"><div id="progress-bar" class="progress-bar"></div></div>
 
 <h1>Memories</h1>
 
@@ -832,11 +855,17 @@ function majStats() {
   const palierIdx = stageParMode[modeKey] || 0
   const palier = STAGES[palierIdx] || STAGES[STAGES.length - 1]
   const level = palierIdx + 1
+  const pool = cartesDuPalier(modeKey === "mixte" ? questionMode : questionMode)
+  const seuil = Math.min(4, thresholdParMode[modeKey] || 1)
+  const ok = pool.filter(c => (c.stats[modeKey]?.points ?? 0) >= seuil).length
+  const ratio = pool.length ? ok / pool.length : 0
   document.getElementById("stats").textContent =
     `Mode ${displayMode} · Niveau ${level} · Palier ${palier.label} · Points : ${stats.points} · Maîtrise : ${(stats.maitrise * 100).toFixed(0)} % · Poids : ${stats.poids.toFixed(2)}`
   const phaseLabel = queueType === "errors" ? "Rattrapage erreurs" : "Passe complète"
   const resume = lastFullSummary ? ` · Dernière passe : ${lastFullSummary.ok} réussies / ${lastFullSummary.fail} ratées` : ""
   document.getElementById("phase").textContent = `Phase : ${phaseLabel}${resume} · Round : ${roundOk} OK / ${roundFail} KO`
+  const bar = document.getElementById("progress-bar")
+  bar.style.transform = `scaleY(${ratio.toFixed(2)})`
 }
 
 function renderTraining() {
