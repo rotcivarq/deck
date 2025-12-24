@@ -1269,6 +1269,31 @@ function prochaineCarte() {
   const pool = cartesDuPalier(questionMode)
   if (!pool.length) return
 
+  // Passage de palier si toutes les cartes du palier courant sont à 5 ou plus
+  const palierIdx = stageParMode[modeKey] || 0
+  const palier = STAGES[palierIdx]
+  const palierComplet = pool.every(c => (c.stats[modeKey]?.points ?? 0) >= 5)
+  if (palierComplet) {
+    if (palierIdx < STAGES.length - 1) {
+      stageParMode[modeKey] = palierIdx + 1
+      stagePending = true
+      nextDue = {}
+      recentIds = []
+      sauvegarder()
+      const next = STAGES[stageParMode[modeKey]]
+      showStageMessage(`Palier ${palier.label} terminé (${questionMode}) → ${next.label}`)
+      lancerConfetti()
+      majStats()
+      return
+    } else {
+      showStageMessage(`Dernier palier terminé (${questionMode})`)
+      lancerConfetti()
+      stagePending = true
+      majStats()
+      return
+    }
+  }
+
   const now = questionCount
   const byPoint = new Map()
   let minPoint = Infinity
