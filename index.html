@@ -23,6 +23,13 @@
     color: #141414;
   }
 
+  .subtitle {
+    font-size: 14px;
+    color: #4a4a4a;
+    margin-top: -18px;
+    margin-bottom: 20px;
+  }
+
   .burger {
     position: fixed;
     top: 16px;
@@ -41,6 +48,28 @@
   }
 
   .burger:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 10px 22px rgba(0,0,0,0.16);
+  }
+
+  .lock-btn {
+    position: fixed;
+    top: 70px;
+    left: 16px;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: 1px solid rgba(0,0,0,0.08);
+    background: #ffffff;
+    font-size: 18px;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 8px 18px rgba(0,0,0,0.12);
+    z-index: 10;
+    transition: transform 120ms ease, box-shadow 120ms ease;
+  }
+
+  .lock-btn:hover {
     transform: translateY(-1px);
     box-shadow: 0 10px 22px rgba(0,0,0,0.16);
   }
@@ -332,9 +361,7 @@
   }
 
   #phase {
-    margin-top: 6px;
-    font-size: 12px;
-    opacity: 0.7;
+    display: none;
   }
 
   .progress-container {
@@ -457,10 +484,12 @@
 <div id="stage-message" class="stage-message"></div>
 
 <button id="burger" class="burger" aria-expanded="false" aria-label="Ouvrir le menu">☰</button>
+<button id="lock-btn" class="lock-btn" aria-pressed="false" aria-label="Verrouiller le scroll">🔓</button>
 <div id="progress-label" class="progress-label">0%</div>
 <div class="progress-container"><div id="progress-bar" class="progress-bar"></div></div>
 
 <h1>Memories</h1>
+<div id="subtitle" class="subtitle"></div>
 
 <div id="menu-panel" class="menu-panel hidden">
   <div id="menu" class="menu"></div>
@@ -561,6 +590,7 @@ const GAP_RULES = [
   { maxScore: 0, min: 6, max: 8 },
   { maxScore: Infinity, min: 8, max: 10 }
 ]
+const TIME_THRESHOLDS = [5, 4, 3, 2, 1.5] // secondes, seulement sur le palier final
 
 /* ============================
    ÉTAT
@@ -601,6 +631,9 @@ let weakHistory = new Set()
 let sinceWeakInject = 0
 let nextDue = {}
 let recentIds = []
+let timeLevelParMode = { dos: 0, face: 0 }
+let scrollLocked = false
+let touchBlocker = null
 
 function cheminCarte(carte) {
   const suitMap = {
@@ -720,6 +753,14 @@ function charger() {
     }
     weakHistory = new Set(sauvegarde.weakHistory || [])
     nextDue = {}
+    if (sauvegarde.timeLevelParMode) {
+      timeLevelParMode = {
+        dos: sauvegarde.timeLevelParMode.dos ?? 0,
+        face: sauvegarde.timeLevelParMode.face ?? 0
+      }
+    } else {
+      timeLevelParMode = { dos: 0, face: 0 }
+    }
   } else {
     creerDeck()
   }
@@ -731,7 +772,8 @@ function sauvegarder() {
     cartes,
     stageParMode,
     thresholdParMode,
-    weakHistory: Array.from(weakHistory)
+    weakHistory: Array.from(weakHistory),
+    timeLevelParMode
   }
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
   planifierSauvegardeCloud(data)
@@ -845,7 +887,23 @@ function majCarte(carte, mode, bon, temps) {
   if (!stats) return
   stats.vues++
   const recidive = !bon && weakHistory.has(carte.id)
-  const delta = bon ? 1 : (recidive ? -3 : -2)
+  const modeKey = mode.toLowerCase()
+  const palierIdx = stageParMode[modeKey] || 0
+  const isFinal = palierIdx === STAGES.length - 1
+  const timeLevel = timeLevelParMode[modeKey] || 0
+  const timeGoalMs = (TIME_THRESHOLDS[timeLevel] ?? TIME_THRESHOLDS[TIME_THRESHOLDS.length - 1]) * 1000
+
+  let delta
+  if (!bon) {
+    delta = recidive ? -3 : -2
+  } else if (isFinal) {
+    if (temps <= timeGoalMs) delta = 1
+    else if (temps <= timeGoalMs * 2) delta = 0.5
+    else delta = 0
+  } else {
+    delta = 1
+  }
+
   stats.points = (stats.points || 0) + delta
   if (bon) {
     stats.succes++
@@ -859,6 +917,7 @@ function majCarte(carte, mode, bon, temps) {
   stats.tempsMoyen = stats.tempsMoyen
     ? stats.tempsMoyen * (1 - alpha) + temps * alpha
     : temps
+  stats.lastTime = temps
 
   const score = bon ? scoreTemps(temps) : 0
   stats.maitrise = stats.maitrise
@@ -981,16 +1040,28 @@ function majStats() {
   const palier = STAGES[palierIdx] || STAGES[STAGES.length - 1]
   const level = palierIdx + 1
   const pool = cartesDuPalier(modeKey === "mixte" ? questionMode : questionMode)
+  const palierIdx = stageParMode[modeKey] || 0
   const maxPts = pool.length * 4 || 1
   const totalPts = pool.reduce((s, c) => {
     const p = c.stats[modeKey]?.points ?? 0
     return s + Math.max(0, Math.min(4, p))
   }, 0)
   const ratio = totalPts / maxPts
+  const isFinalPalier = palierIdx === STAGES.length - 1
+  const timeLevel = timeLevelParMode[modeKey] || 0
+  const timeGoal = TIME_THRESHOLDS[timeLevel] ?? TIME_THRESHOLDS[TIME_THRESHOLDS.length - 1]
+  const timeInfo =
+    isFinalPalier
+      ? ` · Temps cible ≤ ${timeGoal}s`
+      : ""
   document.getElementById("stats").textContent =
-    `Mode ${displayMode} · Niveau ${level} · Palier ${palier.label} · Points : ${stats.points} · Maîtrise : ${(stats.maitrise * 100).toFixed(0)} % · Poids : ${stats.poids.toFixed(2)}`
-  const phaseLabel = "Focus cartes faibles (espacées)"
-  document.getElementById("phase").textContent = `Phase : ${phaseLabel} · Round : ${roundOk} OK / ${roundFail} KO`
+    `Mode ${displayMode} · Niveau ${level} · Palier ${palier.label} · Points : ${stats.points} · Maîtrise : ${(stats.maitrise * 100).toFixed(0)} % · Poids : ${stats.poids.toFixed(2)}${timeInfo}`
+  const subtitle = document.getElementById("subtitle")
+  if (subtitle) {
+    subtitle.textContent = isFinalPalier
+      ? `Palier ${palier.label} · Seuil temps ${timeGoal}s`
+      : `Palier ${palier.label}`
+  }
   const bar = document.getElementById("progress-bar")
   bar.style.transform = `scaleY(${ratio.toFixed(2)})`
   const label = document.getElementById("progress-label")
@@ -1068,6 +1139,7 @@ function resetCycle() {
   questionCount = 0
   nextDue = {}
   recentIds = []
+  timeLevelParMode = { dos: 0, face: 0 }
 }
 
 async function chargerCloud() {
@@ -1092,7 +1164,13 @@ async function chargerCloud() {
         thresholdParMode = { dos: 1, face: 1 }
       }
       weakHistory = new Set(data.weakHistory || [])
-      nextDue = data.nextDue || {}
+      nextDue = {}
+      if (data.timeLevelParMode) {
+        timeLevelParMode = {
+          dos: data.timeLevelParMode.dos ?? 0,
+          face: data.timeLevelParMode.face ?? 0
+        }
+      }
       sauvegarder()
     }
   } catch (e) {
@@ -1269,12 +1347,38 @@ function prochaineCarte() {
   const pool = cartesDuPalier(questionMode)
   if (!pool.length) return
 
-  // Passage de palier si toutes les cartes du palier courant sont à 5 ou plus
+  // Passage de palier / seuil temps
   const palierIdx = stageParMode[modeKey] || 0
   const palier = STAGES[palierIdx]
-  const palierComplet = pool.every(c => (c.stats[modeKey]?.points ?? 0) >= 5)
-  if (palierComplet) {
-    if (palierIdx < STAGES.length - 1) {
+  const isFinalPalier = palierIdx === STAGES.length - 1
+  const timeLevel = timeLevelParMode[modeKey] || 0
+  const timeGoal = TIME_THRESHOLDS[timeLevel] ?? TIME_THRESHOLDS[TIME_THRESHOLDS.length - 1]
+  const palierCompletPoints = pool.every(c => (c.stats[modeKey]?.points ?? 0) >= 5)
+  const palierCompletTemps = !isFinalPalier || pool.every(c => {
+    const t = c.stats[modeKey]?.tempsMoyen
+    return t !== null && t !== undefined && t <= timeGoal * 1000
+  })
+  if (palierCompletPoints && palierCompletTemps) {
+    if (isFinalPalier) {
+      if (timeLevel < TIME_THRESHOLDS.length - 1) {
+        timeLevelParMode[modeKey] = timeLevel + 1
+        stagePending = true
+        nextDue = {}
+        recentIds = []
+        sauvegarder()
+        const nextTime = TIME_THRESHOLDS[timeLevelParMode[modeKey]] ?? timeGoal
+        showStageMessage(`Seuil ${timeGoal}s atteint (${questionMode}) → Nouveau seuil ${nextTime}s`)
+        lancerConfetti()
+        majStats()
+        return
+      } else {
+        showStageMessage(`Dernier seuil atteint (${timeGoal}s) - palier final maîtrisé !`)
+        lancerConfetti()
+        stagePending = true
+        majStats()
+        return
+      }
+    } else {
       stageParMode[modeKey] = palierIdx + 1
       stagePending = true
       nextDue = {}
@@ -1283,12 +1387,6 @@ function prochaineCarte() {
       const next = STAGES[stageParMode[modeKey]]
       showStageMessage(`Palier ${palier.label} terminé (${questionMode}) → ${next.label}`)
       lancerConfetti()
-      majStats()
-      return
-    } else {
-      showStageMessage(`Dernier palier terminé (${questionMode})`)
-      lancerConfetti()
-      stagePending = true
       majStats()
       return
     }
