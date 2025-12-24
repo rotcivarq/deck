@@ -523,8 +523,8 @@ const MODES = ["Dos","Face","Mixte","Training"]
 const STATS_VERSION = "v2"
 const PLAYER_ID_KEY = "mnemo_player_id"
 const API_BASE = ""
-const POIDS_FAIBLE = 9
-const POIDS_MOYEN = 3
+const POIDS_FAIBLE = 12
+const POIDS_MOYEN = 5
 const POIDS_FORT = 1
 const STAGES = (() => {
   const res = []
@@ -546,9 +546,15 @@ const STORAGE_KEY = "memo_cartes_v1"
 const FAST = 800
 const SLOW = 3000
 const QC_EVERY = 10
-const QC_RATIO = 0.05 // 5%
-const ERROR_REPEAT_GOOD_REQUIRED = 1 // nb de bonnes réponses pour sortir de la queue chaude
+const QC_RATIO = 0.03 // 3%
+const ERROR_REPEAT_GOOD_REQUIRED = 2 // nb de bonnes réponses pour sortir de la queue chaude
 const HAPTIC_MS = 12
+const WEAK_INJECT_EVERY = 15
+const HOT_MIN_DELAY = 2
+const HOT_MAX_DELAY = 4
+const HOT_REPEAT = 3
+const LONG_MIN_DELAY = 30
+const LONG_MAX_DELAY = 40
 
 /* ============================
    ÉTAT
@@ -579,9 +585,14 @@ let queueType = "full" // "full" ou "errors"
 let tiragesDepuisQC = 0
 let roundOk = 0
 let roundFail = 0
-let errorQueue = []
-let errorQueueNeeds = {}
+let questionCount = 0
+let errorQueue = [] // ids dues maintenant
+let hotSchedule = [] // { id, repeats, nextDue }
+let longSchedule = [] // { id, nextDue }
 let carteDepuisHotQueue = false
+let carteDepuisLongQueue = false
+let weakHistory = new Set()
+let sinceWeakInject = 0
 
 function cheminCarte(carte) {
   const suitMap = {
@@ -699,6 +710,7 @@ function charger() {
     } else {
       thresholdParMode = { dos: 1, face: 1 }
     }
+    weakHistory = new Set(sauvegarde.weakHistory || [])
   } else {
     creerDeck()
   }
@@ -709,7 +721,8 @@ function sauvegarder() {
     version: STATS_VERSION,
     cartes,
     stageParMode,
-    thresholdParMode
+    thresholdParMode,
+    weakHistory: Array.from(weakHistory)
   }
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
   planifierSauvegardeCloud(data)
@@ -734,23 +747,64 @@ function calculPoids(stats) {
   return 1 // fort
 }
 
-function pushErrorCard(id) {
-  if (!errorQueue.includes(id)) {
-    errorQueue.unshift(id)
-  }
-  errorQueueNeeds[id] = ERROR_REPEAT_GOOD_REQUIRED
+function randInt(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min
 }
 
-function resolveErrorCard(id, bon) {
-  if (errorQueueNeeds[id] === undefined) return
-  if (!bon) {
-    errorQueueNeeds[id] = ERROR_REPEAT_GOOD_REQUIRED
-    return
+function scheduleHot(id, repeats = HOT_REPEAT) {
+  const existing = hotSchedule.find(e => e.id === id)
+  const delay = randInt(HOT_MIN_DELAY, HOT_MAX_DELAY)
+  const nextDue = questionCount + delay
+  if (existing) {
+    existing.repeats = Math.max(existing.repeats, repeats)
+    existing.nextDue = nextDue
+  } else {
+    hotSchedule.push({ id, repeats, nextDue })
   }
-  errorQueueNeeds[id] -= 1
-  if (errorQueueNeeds[id] <= 0) {
-    errorQueue = errorQueue.filter(cId => cId !== id)
-    delete errorQueueNeeds[id]
+}
+
+function scheduleLong(id) {
+  const delay = randInt(LONG_MIN_DELAY, LONG_MAX_DELAY)
+  const nextDue = questionCount + delay
+  const existing = longSchedule.find(e => e.id === id)
+  if (existing) {
+    existing.nextDue = Math.min(existing.nextDue, nextDue)
+  } else {
+    longSchedule.push({ id, nextDue })
+  }
+}
+
+function dueHot(now) {
+  return hotSchedule.filter(e => e.nextDue <= now).map(e => e.id)
+}
+
+function dueLong(now) {
+  return longSchedule.filter(e => e.nextDue <= now).map(e => e.id)
+}
+
+function updateHotAfterAnswer(id, bon) {
+  const entry = hotSchedule.find(e => e.id === id)
+  if (!entry) return
+  if (bon) {
+    entry.repeats -= 1
+    if (entry.repeats <= 0) {
+      hotSchedule = hotSchedule.filter(e => e.id !== id)
+    } else {
+      entry.nextDue = questionCount + randInt(3, 6)
+    }
+  } else {
+    entry.repeats = Math.max(entry.repeats, HOT_REPEAT)
+    entry.nextDue = questionCount + randInt(HOT_MIN_DELAY, HOT_MAX_DELAY)
+  }
+}
+
+function updateLongAfterAnswer(id, bon) {
+  const entry = longSchedule.find(e => e.id === id)
+  if (!entry) return
+  if (bon) {
+    longSchedule = longSchedule.filter(e => e.id !== id)
+  } else {
+    entry.nextDue = questionCount + randInt(LONG_MIN_DELAY, LONG_MAX_DELAY)
   }
 }
 
@@ -772,7 +826,9 @@ function majCarte(carte, mode, bon, temps) {
   const stats = carte.stats[mode.toLowerCase()]
   if (!stats) return
   stats.vues++
-  stats.points = (stats.points || 0) + (bon ? 1 : -2)
+  const recidive = !bon && weakHistory.has(carte.id)
+  const delta = bon ? 1 : (recidive ? -3 : -2)
+  stats.points = (stats.points || 0) + delta
   if (bon) {
     stats.succes++
     stats.serie++
@@ -792,6 +848,11 @@ function majCarte(carte, mode, bon, temps) {
     : score
 
   stats.poids = calculPoids(stats)
+
+  // mémorise les cartes difficiles pour rappel long terme
+  if (stats.points < 0) {
+    weakHistory.add(carte.id)
+  }
 }
 
 /* ============================
@@ -986,8 +1047,12 @@ function resetCycle() {
   roundFail = 0
   derniereCarte = null
   errorQueue = []
-  errorQueueNeeds = {}
+  hotSchedule = []
+  longSchedule = []
   carteDepuisHotQueue = false
+  carteDepuisLongQueue = false
+  sinceWeakInject = 0
+  questionCount = 0
 }
 
 async function chargerCloud() {
@@ -1011,6 +1076,7 @@ async function chargerCloud() {
       } else {
         thresholdParMode = { dos: 1, face: 1 }
       }
+      weakHistory = new Set(data.weakHistory || [])
       sauvegarder()
     }
   } catch (e) {
@@ -1130,9 +1196,13 @@ function tenterValidation() {
     errorsThisRound.add(carteActuelle.id)
   }
   if (!bon) {
-    pushErrorCard(carteActuelle.id)
-  } else if (errorQueueNeeds[carteActuelle.id] !== undefined) {
-    resolveErrorCard(carteActuelle.id, true)
+    scheduleHot(carteActuelle.id, HOT_REPEAT)
+    scheduleLong(carteActuelle.id)
+    updateHotAfterAnswer(carteActuelle.id, false)
+    updateLongAfterAnswer(carteActuelle.id, false)
+  } else {
+    if (carteDepuisHotQueue) updateHotAfterAnswer(carteActuelle.id, true)
+    if (carteDepuisLongQueue) updateLongAfterAnswer(carteActuelle.id, true)
   }
   if (bon) roundOk++
   else roundFail++
@@ -1177,6 +1247,8 @@ function prochaineCarte() {
   if (queueType === "hot" && errorQueue.length === 0) {
     queueType = "full"
   }
+  carteDepuisHotQueue = false
+  carteDepuisLongQueue = false
 
   questionMode =
     modeActuel === "Mixte"
@@ -1198,15 +1270,40 @@ function prochaineCarte() {
   }
 
    // priorité aux erreurs récentes
-  if (errorQueue.length > 0) {
-    queueType = "hot"
-    const hotList = errorQueue
-      .map(id => pool.find(c => c.id === id) || cartes.find(c => c.id === id))
-      .filter(Boolean)
-    if (hotList.length) {
-      queueCartes = shuffle([...hotList])
-    } else {
-      queueType = "full"
+  // file chaude : cartes dues bientôt mais pas immédiatement après l'erreur
+  let dues = []
+  if (queueCartes.length === 0) {
+    dues = dueHot(questionCount)
+    if (dues.length) {
+      queueType = "hot"
+      errorQueue = dues
+      const hotList = dues
+        .map(id => pool.find(c => c.id === id) || cartes.find(c => c.id === id))
+        .filter(Boolean)
+      if (hotList.length) queueCartes = shuffle(hotList)
+    }
+  }
+
+  // rappel long terme : cartes difficiles déjà rencontrées
+  if (queueCartes.length === 0) {
+    const duesLong = dueLong(questionCount)
+    if (duesLong.length) {
+      queueType = "hot"
+      const cards = duesLong
+        .map(id => pool.find(c => c.id === id) || cartes.find(c => c.id === id))
+        .filter(Boolean)
+      if (cards.length) {
+        queueCartes = shuffle(cards).slice(0, 1)
+        carteDepuisLongQueue = true
+      }
+    } else if (weakHistory.size > 0 && sinceWeakInject >= WEAK_INJECT_EVERY) {
+      const weakList = pool.filter(c => weakHistory.has(c.id))
+      if (weakList.length) {
+        queueType = "hot"
+        queueCartes = [weakList[Math.floor(Math.random() * weakList.length)]]
+        sinceWeakInject = 0
+        carteDepuisLongQueue = true
+      }
     }
   }
 
@@ -1228,8 +1325,9 @@ function prochaineCarte() {
             cartes.forEach(c => {
               const st = c.stats[modeKey]
               if (st) {
-                if (st.points >= 4) st.points = 1
-                else if (st.points >= 2) st.points = 0
+                if (st.points > 4) st.points = 3
+                else if (st.points >= 3) st.points = 1
+                else if (st.points >= 1) st.points = 0
                 else st.points = -1
                 st.poids = calculPoids(st)
               }
@@ -1252,15 +1350,24 @@ function prochaineCarte() {
         // pondération faibles/moyens/forts + QC
         roundOk = 0
         roundFail = 0
-        const faibles = pool.filter(c => (c.stats[modeKey]?.points ?? 0) < seuil)
-        const moyens = pool.filter(c => (c.stats[modeKey]?.points ?? 0) === seuil)
-        const forts = pool.filter(c => (c.stats[modeKey]?.points ?? 0) > seuil)
+        const faibles = pool.filter(c => {
+          const p = c.stats[modeKey]?.points ?? 0
+          return p < seuil && p <= 4
+        })
+        const moyens = pool.filter(c => {
+          const p = c.stats[modeKey]?.points ?? 0
+          return p >= seuil && p <= 2
+        })
+        const forts = pool.filter(c => {
+          const p = c.stats[modeKey]?.points ?? 0
+          return p >= 3 && p <= 4
+        })
         const list = []
         faibles.forEach(c => { for (let i = 0; i < POIDS_FAIBLE; i++) list.push(c) })
         moyens.forEach(c => { for (let i = 0; i < POIDS_MOYEN; i++) list.push(c) })
         forts.forEach(c => { for (let i = 0; i < POIDS_FORT; i++) list.push(c) })
-        if (errorQueue.length === 0) {
-          const qcCount = Math.max(1, Math.round(list.length * QC_RATIO))
+        if (errorQueue.length === 0 && faibles.length === 0) {
+          const qcCount = Math.max(0, Math.round(list.length * QC_RATIO))
           for (let i = 0; i < qcCount && forts.length > 0; i++) {
             list.push(forts[Math.floor(Math.random() * forts.length)])
           }
@@ -1270,13 +1377,15 @@ function prochaineCarte() {
         break
       }
     } else { // queueType errors
-      const retard = pool.filter(c => (c.stats[modeKey]?.points ?? 0) < seuil)
+      const retard = pool.filter(c => {
+        const p = c.stats[modeKey]?.points ?? 0
+        return p < seuil && p <= 4
+      })
       if (retard.length === 0) {
         if (seuil < 4) {
           thresholdParMode[modeKey] = seuil + 1
         }
         errorQueue = []
-        errorQueueNeeds = {}
         queueType = "full"
         roundOk = 0
         roundFail = 0
@@ -1285,11 +1394,14 @@ function prochaineCarte() {
       } else {
         roundOk = 0
         roundFail = 0
-        const forts = pool.filter(c => (c.stats[modeKey]?.points ?? 0) >= seuil)
+        const forts = pool.filter(c => {
+          const p = c.stats[modeKey]?.points ?? 0
+          return p >= 3 && p <= 4
+        })
         const list = []
         retard.forEach(c => { for (let i = 0; i < POIDS_FAIBLE; i++) list.push(c) })
-        if (errorQueue.length === 0) {
-          const qcCount = Math.max(1, Math.round(list.length * QC_RATIO))
+        if (errorQueue.length === 0 && retard.length === 0) {
+          const qcCount = Math.max(0, Math.round(list.length * QC_RATIO))
           for (let i = 0; i < qcCount && forts.length > 0; i++) {
             list.push(forts[Math.floor(Math.random() * forts.length)])
           }
@@ -1313,7 +1425,14 @@ function prochaineCarte() {
   carteActuelle = queueCartes.shift()
   carteDepuisHotQueue = errorQueue.includes(carteActuelle.id)
   derniereCarte = carteActuelle
+  sinceWeakInject++
+  questionCount++
   afficherCarte()
+  if (queueType !== "hot") {
+    errorQueue = []
+  } else if (!dues.length) {
+    errorQueue = []
+  }
 }
 
 function lancerConfetti() {
@@ -1371,6 +1490,10 @@ function resetProgression() {
 function fullReset() {
   stageParMode = { dos: 0, face: 0 }
   thresholdParMode = { dos: 1, face: 1 }
+  weakHistory.clear()
+  hotSchedule = []
+  longSchedule = []
+  errorQueue = []
   cartes.forEach(c => {
     Object.values(c.stats).forEach(st => {
       st.points = 0
