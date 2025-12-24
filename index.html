@@ -856,9 +856,12 @@ function majStats() {
   const palier = STAGES[palierIdx] || STAGES[STAGES.length - 1]
   const level = palierIdx + 1
   const pool = cartesDuPalier(modeKey === "mixte" ? questionMode : questionMode)
-  const seuil = Math.min(4, thresholdParMode[modeKey] || 1)
-  const ok = pool.filter(c => (c.stats[modeKey]?.points ?? 0) >= seuil).length
-  const ratio = pool.length ? ok / pool.length : 0
+  const maxPts = pool.length * 4 || 1
+  const totalPts = pool.reduce((s, c) => {
+    const p = c.stats[modeKey]?.points ?? 0
+    return s + Math.max(0, Math.min(4, p))
+  }, 0)
+  const ratio = totalPts / maxPts
   document.getElementById("stats").textContent =
     `Mode ${displayMode} · Niveau ${level} · Palier ${palier.label} · Points : ${stats.points} · Maîtrise : ${(stats.maitrise * 100).toFixed(0)} % · Poids : ${stats.poids.toFixed(2)}`
   const phaseLabel = queueType === "errors" ? "Rattrapage erreurs" : "Passe complète"
