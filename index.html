@@ -1281,21 +1281,29 @@ function prochaineCarte() {
 
   const sortedPoints = Array.from(byPoint.keys()).sort((a, b) => a - b)
   let chosen = null
-  const worstScore = sortedPoints[0]
-  const worstList = byPoint.get(worstScore) || []
-  if (worstList.length) {
-    const readyWorst = worstList.filter(e => (e.due ?? 0) <= now && !recentIds.includes(e.card.id))
-    if (readyWorst.length) {
-      chosen = readyWorst[Math.floor(Math.random() * readyWorst.length)].card
-    } else {
-      const nextSoon = worstList.filter(e => !recentIds.includes(e.card.id))
-      const targetList = nextSoon.length ? nextSoon : worstList
-      targetList.sort((a, b) => (a.due ?? 0) - (b.due ?? 0))
-      chosen = targetList[0]?.card
+
+  // 1) Cherche une carte prête (due <= now) en partant du pire score, en excluant les 3 dernières
+  for (const p of sortedPoints) {
+    const ready = (byPoint.get(p) || []).filter(e => (e.due ?? 0) <= now && !recentIds.includes(e.card.id))
+    if (ready.length) {
+      chosen = ready[Math.floor(Math.random() * ready.length)].card
+      break
     }
-  } else {
-    chosen = pool[0]
   }
+
+  // 2) Si aucune prête, prend la plus proche échéance parmi les pires, en excluant recent si possible
+  if (!chosen) {
+    const worstScore = sortedPoints[0]
+    const worstList = byPoint.get(worstScore) || []
+    const nonRecent = worstList.filter(e => !recentIds.includes(e.card.id))
+    const targetList = nonRecent.length ? nonRecent : worstList
+    if (targetList.length) {
+      targetList.sort((a, b) => (a.due ?? 0) - (b.due ?? 0))
+      chosen = targetList[0].card
+    }
+  }
+
+  if (!chosen) chosen = pool[0]
 
   if (!chosen) return
 
