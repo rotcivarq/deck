@@ -600,6 +600,7 @@ let carteDepuisLongQueue = false
 let weakHistory = new Set()
 let sinceWeakInject = 0
 let nextDue = {}
+let recentIds = []
 
 function cheminCarte(carte) {
   const suitMap = {
@@ -1066,6 +1067,7 @@ function resetCycle() {
   sinceWeakInject = 0
   questionCount = 0
   nextDue = {}
+  recentIds = []
 }
 
 async function chargerCloud() {
@@ -1282,12 +1284,14 @@ function prochaineCarte() {
   const worstScore = sortedPoints[0]
   const worstList = byPoint.get(worstScore) || []
   if (worstList.length) {
-    const readyWorst = worstList.filter(e => (e.due ?? 0) <= now)
+    const readyWorst = worstList.filter(e => (e.due ?? 0) <= now && !recentIds.includes(e.card.id))
     if (readyWorst.length) {
       chosen = readyWorst[Math.floor(Math.random() * readyWorst.length)].card
     } else {
-      worstList.sort((a, b) => (a.due ?? 0) - (b.due ?? 0))
-      chosen = worstList[0].card
+      const nextSoon = worstList.filter(e => !recentIds.includes(e.card.id))
+      const targetList = nextSoon.length ? nextSoon : worstList
+      targetList.sort((a, b) => (a.due ?? 0) - (b.due ?? 0))
+      chosen = targetList[0]?.card
     }
   } else {
     chosen = pool[0]
@@ -1298,15 +1302,18 @@ function prochaineCarte() {
   const score = chosen.stats[modeKey]?.points ?? 0
   const gap = gapForScore(score)
   nextDue[chosen.id] = now + gap
-  // éviter immédiat : impose au moins 1 carte entre deux tirages identiques
-  if (derniereCarte && derniereCarte.id === chosen.id) {
-    nextDue[chosen.id] = now + Math.max(1, gap)
+  // éviter les répétitions : impose au moins 3 cartes avant de revoir la même
+  const minGap = 3
+  if (recentIds.includes(chosen.id)) {
+    nextDue[chosen.id] = now + Math.max(minGap, gap)
   }
 
   carteActuelle = chosen
   derniereCarte = carteActuelle
   sinceWeakInject++
   questionCount++
+  recentIds.push(chosen.id)
+  if (recentIds.length > 3) recentIds.shift()
   afficherCarte()
 }
 
