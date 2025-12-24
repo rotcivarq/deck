@@ -1298,6 +1298,10 @@ function prochaineCarte() {
   const score = chosen.stats[modeKey]?.points ?? 0
   const gap = gapForScore(score)
   nextDue[chosen.id] = now + gap
+  // éviter immédiat : impose au moins 1 carte entre deux tirages identiques
+  if (derniereCarte && derniereCarte.id === chosen.id) {
+    nextDue[chosen.id] = now + Math.max(1, gap)
+  }
 
   carteActuelle = chosen
   derniereCarte = carteActuelle
