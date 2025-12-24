@@ -659,6 +659,7 @@ let pendingDelta = null
 let chronoInterval = null
 let chronoStartAt = 0
 const preloadedFaces = new Set()
+let ignoreClicksUntil = 0
 
 function cheminCarte(carte) {
   const suitMap = {
@@ -1469,6 +1470,7 @@ function tenterValidation() {
   } else {
     showDeltaBadge(delta, false)
     const handler = () => {
+      if (Date.now() < ignoreClicksUntil) return
       flash.classList.remove("visible")
       document.getElementById("overlay-correction").classList.remove("visible")
       clearInterval(chronoInterval)
@@ -1477,6 +1479,7 @@ function tenterValidation() {
     }
     // Attendre la fin du clic courant pour ne pas auto-avancer
     setTimeout(() => document.addEventListener("click", handler, true), 0)
+    ignoreClicksUntil = Date.now() + 500
   }
 }
 
