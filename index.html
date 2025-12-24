@@ -931,6 +931,7 @@ function majCarte(carte, mode, bon, temps) {
   if (stats.points < 0) {
     weakHistory.add(carte.id)
   }
+  return delta
 }
 
 /* ============================
@@ -1319,7 +1320,7 @@ function tenterValidation() {
     bon = num === carteActuelle.numero
   }
 
-  majCarte(carteActuelle, questionMode, bon, temps)
+  const delta = majCarte(carteActuelle, questionMode, bon, temps) || 0
   sauvegarder()
 
   if (!bon && queueType === "full") {
@@ -1352,8 +1353,8 @@ function tenterValidation() {
   // Affiche le delta de points
   const deltaEl = document.createElement("div")
   deltaEl.style.position = "fixed"
-  deltaEl.style.top = "55%"
-  deltaEl.style.left = "50%"
+  deltaEl.style.top = "45%"
+  deltaEl.style.left = "65%"
   deltaEl.style.transform = "translate(-50%, -50%)"
   deltaEl.style.fontSize = "28px"
   deltaEl.style.fontWeight = "800"
@@ -1363,12 +1364,19 @@ function tenterValidation() {
   deltaEl.style.color = bon ? "#0b7c2f" : "#b00020"
   deltaEl.style.boxShadow = "0 8px 18px rgba(0,0,0,0.12)"
   deltaEl.style.zIndex = 1900
-  const deltaText = bon
-    ? (temps <= (TIME_THRESHOLDS[timeLevelParMode[modeKey] || 0] ?? TIME_THRESHOLDS[TIME_THRESHOLDS.length - 1]) * 1000 ? "+1" : (temps <= (TIME_THRESHOLDS[timeLevelParMode[modeKey] || 0] ?? TIME_THRESHOLDS[TIME_THRESHOLDS.length - 1]) * 2000 ? "+0.5" : "+0"))
-    : (weakHistory.has(carteActuelle.id) ? "-3" : "-2")
+  deltaEl.style.transition = "transform 220ms ease, opacity 220ms ease"
+  const deltaText = delta > 0 ? `+${Number.isInteger(delta) ? delta : delta.toFixed(1)}` : `${delta}`
   deltaEl.textContent = deltaText
   document.body.appendChild(deltaEl)
-  setTimeout(() => deltaEl.remove(), 800)
+  requestAnimationFrame(() => {
+    deltaEl.style.transform = "translate(-50%, -50%) scale(1.25)"
+    deltaEl.style.opacity = "1"
+  })
+  setTimeout(() => {
+    deltaEl.style.opacity = "0"
+    deltaEl.style.transform = "translate(-50%, -50%) scale(0.9)"
+    setTimeout(() => deltaEl.remove(), 300)
+  }, 1000)
 
   if (bon) {
     setTimeout(() => {
