@@ -634,6 +634,7 @@ let recentIds = []
 let timeLevelParMode = { dos: 0, face: 0 }
 let scrollLocked = false
 let touchBlocker = null
+let scrollTopBackup = 0
 
 function cheminCarte(carte) {
   const suitMap = {
@@ -1040,7 +1041,6 @@ function majStats() {
   const palier = STAGES[palierIdx] || STAGES[STAGES.length - 1]
   const level = palierIdx + 1
   const pool = cartesDuPalier(modeKey === "mixte" ? questionMode : questionMode)
-  const palierIdx = stageParMode[modeKey] || 0
   const maxPts = pool.length * 4 || 1
   const totalPts = pool.reduce((s, c) => {
     const p = c.stats[modeKey]?.points ?? 0
@@ -1193,6 +1193,24 @@ async function sauvegarderCloud(data) {
 function planifierSauvegardeCloud(data) {
   clearTimeout(saveCloudTimeout)
   saveCloudTimeout = setTimeout(() => sauvegarderCloud(data), 400)
+}
+
+function setScrollLock(lock) {
+  const btn = document.getElementById("lock-btn")
+  scrollLocked = lock
+  if (scrollLocked) {
+    scrollTopBackup = window.scrollY || document.documentElement.scrollTop || 0
+    document.body.style.overflow = "hidden"
+    document.body.style.touchAction = "none"
+    btn.textContent = "🔒"
+    btn.setAttribute("aria-pressed", "true")
+  } else {
+    document.body.style.overflow = ""
+    document.body.style.touchAction = ""
+    btn.textContent = "🔓"
+    btn.setAttribute("aria-pressed", "false")
+    window.scrollTo(0, scrollTopBackup || 0)
+  }
 }
 
 function setMenu(open) {
@@ -1508,6 +1526,7 @@ function fullReset() {
   longSchedule = []
   errorQueue = []
   nextDue = {}
+  timeLevelParMode = { dos: 0, face: 0 }
   cartes.forEach(c => {
     Object.values(c.stats).forEach(st => {
       st.points = 0
@@ -1536,12 +1555,15 @@ const burgerBtn = document.getElementById("burger")
 const menuPanel = document.getElementById("menu-panel")
 const resetBtn = document.getElementById("reset")
 const resetAllBtn = document.getElementById("reset-all")
+const lockBtn = document.getElementById("lock-btn")
 burgerBtn.addEventListener("click", (e) => { e.stopPropagation(); haptic(); setMenu(!menuOuvert) })
 menuPanel.addEventListener("click", (e) => e.stopPropagation())
 document.addEventListener("click", () => setMenu(false))
 resetBtn.addEventListener("click", (e) => { e.stopPropagation(); haptic(); resetProgression() })
 resetAllBtn.addEventListener("click", (e) => { e.stopPropagation(); haptic(); fullReset() })
+lockBtn.addEventListener("click", (e) => { e.stopPropagation(); haptic(); setScrollLock(!scrollLocked) })
 setMenu(false)
+setScrollLock(false)
 
 ensurePlayerId()
 charger()
