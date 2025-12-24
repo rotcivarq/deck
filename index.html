@@ -658,6 +658,7 @@ let scrollTopBackup = 0
 let pendingDelta = null
 let chronoInterval = null
 let chronoStartAt = 0
+const preloadedFaces = new Set()
 
 function cheminCarte(carte) {
   const suitMap = {
@@ -680,6 +681,19 @@ function cheminCarte(carte) {
     file += "2"
   }
   return `CARDS/${file}.png`
+}
+
+function preloadAllFaces() {
+  ORDERED_CARDS.forEach(label => {
+    const [valeur, , couleur] = label.split(" ")
+    const fake = { valeur, couleur }
+    const src = cheminCarte(fake)
+    if (src && !preloadedFaces.has(src)) {
+      const img = new Image()
+      img.src = src
+      preloadedFaces.add(src)
+    }
+  })
 }
 
 function haptic() {
@@ -1689,6 +1703,7 @@ setScrollLock(false)
 ensurePlayerId()
 charger()
 chargerCloud().finally(() => {
+  preloadAllFaces()
   afficherBoutons()
   prochaineCarte()
 })
