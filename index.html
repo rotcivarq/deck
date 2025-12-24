@@ -1072,6 +1072,7 @@ function renderTraining() {
   const training = document.getElementById("training")
   const faceStage = STAGES[stageParMode.face] || STAGES[STAGES.length - 1]
   const subset = cartes.filter(c => c.numero >= faceStage.start && c.numero <= faceStage.end)
+  const fmt = (n) => Number.isInteger(n) ? n : n.toFixed(1)
   const sorted = subset
     .map(c => ({
       carte: c,
@@ -1087,9 +1088,9 @@ function renderTraining() {
       <tr>
         <td>${item.carte.numero}</td>
         <td>${item.carte.valeur} de ${item.carte.couleur}</td>
-        <td class="${cls}">${item.total}</td>
-        <td>${item.facePts}</td>
-        <td>${item.dosPts}</td>
+        <td class="${cls}">${fmt(item.total)}</td>
+        <td>${fmt(item.facePts)}</td>
+        <td>${fmt(item.dosPts)}</td>
       </tr>
     `
   }).join("")
@@ -1348,6 +1349,27 @@ function tenterValidation() {
   majStats()
   const flash = document.getElementById("flash")
   flash.className = `flash ${bon ? "good" : "bad"} visible`
+  // Affiche le delta de points
+  const deltaEl = document.createElement("div")
+  deltaEl.style.position = "fixed"
+  deltaEl.style.top = "55%"
+  deltaEl.style.left = "50%"
+  deltaEl.style.transform = "translate(-50%, -50%)"
+  deltaEl.style.fontSize = "28px"
+  deltaEl.style.fontWeight = "800"
+  deltaEl.style.padding = "6px 10px"
+  deltaEl.style.borderRadius = "10px"
+  deltaEl.style.background = bon ? "rgba(0,170,60,0.18)" : "rgba(200,0,0,0.2)"
+  deltaEl.style.color = bon ? "#0b7c2f" : "#b00020"
+  deltaEl.style.boxShadow = "0 8px 18px rgba(0,0,0,0.12)"
+  deltaEl.style.zIndex = 1900
+  const deltaText = bon
+    ? (temps <= (TIME_THRESHOLDS[timeLevelParMode[modeKey] || 0] ?? TIME_THRESHOLDS[TIME_THRESHOLDS.length - 1]) * 1000 ? "+1" : (temps <= (TIME_THRESHOLDS[timeLevelParMode[modeKey] || 0] ?? TIME_THRESHOLDS[TIME_THRESHOLDS.length - 1]) * 2000 ? "+0.5" : "+0"))
+    : (weakHistory.has(carteActuelle.id) ? "-3" : "-2")
+  deltaEl.textContent = deltaText
+  document.body.appendChild(deltaEl)
+  setTimeout(() => deltaEl.remove(), 800)
+
   if (bon) {
     setTimeout(() => {
       flash.classList.remove("visible")
