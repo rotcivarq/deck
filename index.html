@@ -555,6 +555,8 @@ const HOT_MAX_DELAY = 4
 const HOT_REPEAT = 3
 const LONG_MIN_DELAY = 30
 const LONG_MAX_DELAY = 40
+const MIN_GAP = 5
+const MAX_GAP = 10
 
 /* ============================
    ÉTAT
@@ -593,6 +595,7 @@ let carteDepuisHotQueue = false
 let carteDepuisLongQueue = false
 let weakHistory = new Set()
 let sinceWeakInject = 0
+let nextDue = {}
 
 function cheminCarte(carte) {
   const suitMap = {
@@ -711,6 +714,7 @@ function charger() {
       thresholdParMode = { dos: 1, face: 1 }
     }
     weakHistory = new Set(sauvegarde.weakHistory || [])
+    nextDue = sauvegarde.nextDue || {}
   } else {
     creerDeck()
   }
@@ -722,7 +726,8 @@ function sauvegarder() {
     cartes,
     stageParMode,
     thresholdParMode,
-    weakHistory: Array.from(weakHistory)
+    weakHistory: Array.from(weakHistory),
+    nextDue
   }
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
   planifierSauvegardeCloud(data)
@@ -971,13 +976,8 @@ function majStats() {
   const ratio = totalPts / maxPts
   document.getElementById("stats").textContent =
     `Mode ${displayMode} · Niveau ${level} · Palier ${palier.label} · Points : ${stats.points} · Maîtrise : ${(stats.maitrise * 100).toFixed(0)} % · Poids : ${stats.poids.toFixed(2)}`
-  const phaseLabel = errorQueue.length > 0
-    ? "Erreurs chaudes"
-    : queueType === "errors"
-      ? "Rattrapage erreurs"
-      : "Passe complète"
-  const resume = lastFullSummary ? ` · Dernière passe : ${lastFullSummary.ok} réussies / ${lastFullSummary.fail} ratées` : ""
-  document.getElementById("phase").textContent = `Phase : ${phaseLabel}${resume} · Round : ${roundOk} OK / ${roundFail} KO`
+  const phaseLabel = "Focus cartes faibles (espacées)"
+  document.getElementById("phase").textContent = `Phase : ${phaseLabel} · Round : ${roundOk} OK / ${roundFail} KO`
   const bar = document.getElementById("progress-bar")
   bar.style.transform = `scaleY(${ratio.toFixed(2)})`
   const label = document.getElementById("progress-label")
@@ -1053,6 +1053,7 @@ function resetCycle() {
   carteDepuisLongQueue = false
   sinceWeakInject = 0
   questionCount = 0
+  nextDue = {}
 }
 
 async function chargerCloud() {
@@ -1077,6 +1078,7 @@ async function chargerCloud() {
         thresholdParMode = { dos: 1, face: 1 }
       }
       weakHistory = new Set(data.weakHistory || [])
+      nextDue = data.nextDue || {}
       sauvegarder()
     }
   } catch (e) {
@@ -1195,14 +1197,12 @@ function tenterValidation() {
   if (!bon && queueType === "full") {
     errorsThisRound.add(carteActuelle.id)
   }
-  if (!bon) {
-    scheduleHot(carteActuelle.id, HOT_REPEAT)
-    scheduleLong(carteActuelle.id)
-    updateHotAfterAnswer(carteActuelle.id, false)
-    updateLongAfterAnswer(carteActuelle.id, false)
-  } else {
+  if (bon) {
     if (carteDepuisHotQueue) updateHotAfterAnswer(carteActuelle.id, true)
     if (carteDepuisLongQueue) updateLongAfterAnswer(carteActuelle.id, true)
+  } else {
+    updateHotAfterAnswer(carteActuelle.id, false)
+    updateLongAfterAnswer(carteActuelle.id, false)
   }
   if (bon) roundOk++
   else roundFail++
@@ -1242,11 +1242,7 @@ function prochaineCarte() {
     renderTraining()
     return
   }
-  // si fin de palier en attente de clic, ne pas avancer
   if (stagePending) return
-  if (queueType === "hot" && errorQueue.length === 0) {
-    queueType = "full"
-  }
   carteDepuisHotQueue = false
   carteDepuisLongQueue = false
 
@@ -1256,183 +1252,48 @@ function prochaineCarte() {
       : (modeActuel === "Entrainement" ? "Dos" : modeActuel)
 
   const modeKey = questionMode.toLowerCase()
-  const palierIdx = stageParMode[modeKey] || 0
-  const level = palierIdx + 1
-  const seuil = Math.min(4, thresholdParMode[modeKey] || 1)
   const pool = cartesDuPalier(questionMode)
+  if (!pool.length) return
 
-  // Premier tour d'un palier : jamais démarrer en rattrapage
-  if (!lastFullSummary) {
-    queueType = "full"
-    errorsThisRound.clear()
-    roundOk = 0
-    roundFail = 0
+  const now = questionCount
+  const byPoint = new Map()
+  let minPoint = Infinity
+  pool.forEach(c => {
+    const p = c.stats[modeKey]?.points ?? 0
+    minPoint = Math.min(minPoint, p)
+    if (!byPoint.has(p)) byPoint.set(p, [])
+    byPoint.get(p).push({ card: c, due: nextDue[c.id] ?? 0 })
+  })
+
+  const sortedPoints = Array.from(byPoint.keys()).sort((a, b) => a - b)
+  let chosen = null
+  for (const p of sortedPoints) {
+    const ready = (byPoint.get(p) || []).filter(e => (e.due ?? 0) <= now)
+    if (ready.length) {
+      chosen = ready[Math.floor(Math.random() * ready.length)].card
+      break
+    }
   }
-
-   // priorité aux erreurs récentes
-  // file chaude : cartes dues bientôt mais pas immédiatement après l'erreur
-  let dues = []
-  if (queueCartes.length === 0) {
-    dues = dueHot(questionCount)
-    if (dues.length) {
-      queueType = "hot"
-      errorQueue = dues
-      const hotList = dues
-        .map(id => pool.find(c => c.id === id) || cartes.find(c => c.id === id))
-        .filter(Boolean)
-      if (hotList.length) queueCartes = shuffle(hotList)
+  if (!chosen) {
+    const lowest = byPoint.get(sortedPoints[0]) || []
+    if (lowest.length) {
+      lowest.sort((a, b) => (a.due ?? 0) - (b.due ?? 0))
+      chosen = lowest[0].card
+    } else {
+      chosen = pool[0]
     }
   }
 
-  // rappel long terme : cartes difficiles déjà rencontrées
-  if (queueCartes.length === 0) {
-    const duesLong = dueLong(questionCount)
-    if (duesLong.length) {
-      queueType = "hot"
-      const cards = duesLong
-        .map(id => pool.find(c => c.id === id) || cartes.find(c => c.id === id))
-        .filter(Boolean)
-      if (cards.length) {
-        queueCartes = shuffle(cards).slice(0, 1)
-        carteDepuisLongQueue = true
-      }
-    } else if (weakHistory.size > 0 && sinceWeakInject >= WEAK_INJECT_EVERY) {
-      const weakList = pool.filter(c => weakHistory.has(c.id))
-      if (weakList.length) {
-        queueType = "hot"
-        queueCartes = [weakList[Math.floor(Math.random() * weakList.length)]]
-        sinceWeakInject = 0
-        carteDepuisLongQueue = true
-      }
-    }
-  }
+  if (!chosen) return
 
-  while (queueCartes.length === 0) {
-    if (queueType === "full") {
-      roundOk = 0
-      roundFail = 0
-      const ok = pool.filter(c => (c.stats[modeKey]?.points ?? 0) >= seuil).length
-      const fail = pool.length - ok
-      lastFullSummary = { ok, fail }
+  const gap = randInt(MIN_GAP, MAX_GAP)
+  nextDue[chosen.id] = now + gap
 
-      if (fail === 0 || (ok / pool.length) >= 0.95) {
-        const oldStage = palierIdx
-        if (oldStage < STAGES.length - 1) {
-          stageParMode[modeKey] = oldStage + 1
-          const next = STAGES[stageParMode[modeKey]]
-          // reset intelligent si palier repart à 1
-          if (next.start === 1) {
-            cartes.forEach(c => {
-              const st = c.stats[modeKey]
-              if (st) {
-                if (st.points > 4) st.points = 3
-                else if (st.points >= 3) st.points = 1
-                else if (st.points >= 1) st.points = 0
-                else st.points = -1
-                st.poids = calculPoids(st)
-              }
-            })
-          }
-          thresholdParMode[modeKey] = 1
-          resetCycle()
-          stagePending = true
-          sauvegarder()
-          showStageMessage(`Palier ${STAGES[oldStage].label} terminé (${questionMode}) → ${next.label} · ${ok} réussies / ${fail} ratées`)
-          lancerConfetti()
-          majStats()
-          return
-        } else {
-          queueCartes = []
-          break
-        }
-      } else {
-        queueType = "errors"
-        // pondération faibles/moyens/forts + QC
-        roundOk = 0
-        roundFail = 0
-        const faibles = pool.filter(c => {
-          const p = c.stats[modeKey]?.points ?? 0
-          return p < seuil && p <= 4
-        })
-        const moyens = pool.filter(c => {
-          const p = c.stats[modeKey]?.points ?? 0
-          return p >= seuil && p <= 2
-        })
-        const forts = pool.filter(c => {
-          const p = c.stats[modeKey]?.points ?? 0
-          return p >= 3 && p <= 4
-        })
-        const list = []
-        faibles.forEach(c => { for (let i = 0; i < POIDS_FAIBLE; i++) list.push(c) })
-        moyens.forEach(c => { for (let i = 0; i < POIDS_MOYEN; i++) list.push(c) })
-        forts.forEach(c => { for (let i = 0; i < POIDS_FORT; i++) list.push(c) })
-        if (errorQueue.length === 0 && faibles.length === 0) {
-          const qcCount = Math.max(0, Math.round(list.length * QC_RATIO))
-          for (let i = 0; i < qcCount && forts.length > 0; i++) {
-            list.push(forts[Math.floor(Math.random() * forts.length)])
-          }
-        }
-        queueCartes = shuffle(list)
-        errorsThisRound.clear()
-        break
-      }
-    } else { // queueType errors
-      const retard = pool.filter(c => {
-        const p = c.stats[modeKey]?.points ?? 0
-        return p < seuil && p <= 4
-      })
-      if (retard.length === 0) {
-        if (seuil < 4) {
-          thresholdParMode[modeKey] = seuil + 1
-        }
-        errorQueue = []
-        queueType = "full"
-        roundOk = 0
-        roundFail = 0
-        queueCartes = shuffle([...pool])
-        break
-      } else {
-        roundOk = 0
-        roundFail = 0
-        const forts = pool.filter(c => {
-          const p = c.stats[modeKey]?.points ?? 0
-          return p >= 3 && p <= 4
-        })
-        const list = []
-        retard.forEach(c => { for (let i = 0; i < POIDS_FAIBLE; i++) list.push(c) })
-        if (errorQueue.length === 0 && retard.length === 0) {
-          const qcCount = Math.max(0, Math.round(list.length * QC_RATIO))
-          for (let i = 0; i < qcCount && forts.length > 0; i++) {
-            list.push(forts[Math.floor(Math.random() * forts.length)])
-          }
-        }
-        queueCartes = shuffle(list)
-        break
-      }
-    }
-  }
-
-  // éviter la même carte deux fois de suite si possible
-  if (derniereCarte && queueCartes.length > 1 && queueCartes[0].id === derniereCarte.id) {
-    const swapIdx = queueCartes.findIndex(c => c.id !== derniereCarte.id)
-    if (swapIdx > 0) {
-      const tmp = queueCartes[0]
-      queueCartes[0] = queueCartes[swapIdx]
-      queueCartes[swapIdx] = tmp
-    }
-  }
-
-  carteActuelle = queueCartes.shift()
-  carteDepuisHotQueue = errorQueue.includes(carteActuelle.id)
+  carteActuelle = chosen
   derniereCarte = carteActuelle
   sinceWeakInject++
   questionCount++
   afficherCarte()
-  if (queueType !== "hot") {
-    errorQueue = []
-  } else if (!dues.length) {
-    errorQueue = []
-  }
 }
 
 function lancerConfetti() {
@@ -1494,6 +1355,7 @@ function fullReset() {
   hotSchedule = []
   longSchedule = []
   errorQueue = []
+  nextDue = {}
   cartes.forEach(c => {
     Object.values(c.stats).forEach(st => {
       st.points = 0
