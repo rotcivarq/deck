@@ -399,22 +399,25 @@
 
   .chrono {
     position: fixed;
-    top: 120px;
+    top: 140px;
     left: 50%;
     transform: translateX(-50%);
-    font-size: 16px;
+    font-size: 13px;
+    font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+    font-feature-settings: "tnum";
     font-weight: 700;
-    padding: 6px 10px;
-    border-radius: 10px;
-    background: rgba(255,255,255,0.65);
-    box-shadow: 0 8px 18px rgba(0,0,0,0.12);
+    padding: 4px 8px;
+    border-radius: 8px;
+    background: transparent;
+    box-shadow: none;
     z-index: 8;
+    color: #555;
   }
 
   .carte {
     width: 170px;
     height: 250px;
-    margin: 24px auto 60px;
+    margin: 60px auto 50px;
     border-radius: 14px;
     background: url("Back.jpg") center/cover no-repeat;
     box-shadow: 0 10px 24px rgba(0,0,0,0.16);
@@ -1362,16 +1365,15 @@ function afficherCarte() {
     const secs = elapsed / 1000
     chronoEl.textContent = `${secs.toFixed(2)}s`
     if (!isFinal) {
-      chronoEl.style.background = "rgba(255,255,255,0.65)"
-      chronoEl.style.color = "#0e0e0e"
+      chronoEl.style.color = "#555"
       return
     }
     if (elapsed <= timeGoal) {
-      chronoEl.style.color = "#0b7c2f"
+      chronoEl.style.color = "#3c704d"
     } else if (elapsed <= timeGoal * 2) {
-      chronoEl.style.color = "#c7a600"
+      chronoEl.style.color = "#8b7a2b"
     } else {
-      chronoEl.style.color = "#c05b00"
+      chronoEl.style.color = "#8a4f2c"
     }
   }
   updateChrono()
