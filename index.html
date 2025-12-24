@@ -555,8 +555,13 @@ const HOT_MAX_DELAY = 4
 const HOT_REPEAT = 3
 const LONG_MIN_DELAY = 30
 const LONG_MAX_DELAY = 40
-const MIN_GAP = 5
-const MAX_GAP = 10
+const GAP_RULES = [
+  { maxScore: -5, min: 2, max: 3 },
+  { maxScore: -2, min: 3, max: 5 },
+  { maxScore: 0, min: 4, max: 6 },
+  { maxScore: 2, min: 5, max: 8 },
+  { maxScore: Infinity, min: 8, max: 12 }
+]
 
 /* ============================
    ÉTAT
@@ -754,6 +759,15 @@ function calculPoids(stats) {
 
 function randInt(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min
+}
+
+function gapForScore(score) {
+  for (const rule of GAP_RULES) {
+    if (score <= rule.maxScore) {
+      return randInt(rule.min, rule.max)
+    }
+  }
+  return randInt(5, 10)
 }
 
 function scheduleHot(id, repeats = HOT_REPEAT) {
@@ -1286,7 +1300,8 @@ function prochaineCarte() {
 
   if (!chosen) return
 
-  const gap = randInt(MIN_GAP, MAX_GAP)
+  const score = chosen.stats[modeKey]?.points ?? 0
+  const gap = gapForScore(score)
   nextDue[chosen.id] = now + gap
 
   carteActuelle = chosen
