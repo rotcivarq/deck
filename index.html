@@ -1070,7 +1070,7 @@ function afficherBoutons() {
     groupe.forEach(val => {
       const b = document.createElement("button")
       b.textContent = val
-      b.addEventListener("pointerdown", (e) => { e.preventDefault(); haptic(); valeurChoisie = val; tenterValidation() })
+      b.onclick = () => { haptic(); valeurChoisie = val; tenterValidation() }
       ligne.appendChild(b)
     })
     v.appendChild(ligne)
@@ -1079,7 +1079,7 @@ function afficherBoutons() {
   COULEURS.forEach(col => {
     const b = document.createElement("button")
     b.textContent = col
-    b.addEventListener("pointerdown", (e) => { e.preventDefault(); haptic(); couleurChoisie = col; tenterValidation() })
+    b.onclick = () => { haptic(); couleurChoisie = col; tenterValidation() }
     b.classList.add("suit")
     b.classList.add(`suit-${SUIT_CLASSES[col]}`)
     b.dataset.symbole = SUIT_SYMBOLS[col]
@@ -1089,7 +1089,7 @@ function afficherBoutons() {
   ;[1,2,3,4,5,6,7,8,9,0,"⌫","OK"].forEach(val => {
     const b = document.createElement("button")
     b.textContent = val
-    b.addEventListener("pointerdown", (e) => { e.preventDefault(); haptic(); gererClavier(val) })
+    b.onclick = () => { haptic(); gererClavier(val) }
     clavier.appendChild(b)
   })
 }
