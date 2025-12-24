@@ -656,6 +656,7 @@ let touchBlocker = null
 let scrollTopBackup = 0
 let pendingDelta = null
 let chronoInterval = null
+let chronoStartAt = 0
 
 function cheminCarte(carte) {
   const suitMap = {
@@ -684,6 +685,39 @@ function haptic() {
   if (navigator.vibrate) {
     navigator.vibrate(HAPTIC_MS)
   }
+}
+
+function initChrono() {
+  clearInterval(chronoInterval)
+  const chronoEl = document.getElementById("chrono")
+  const modeKey = (modeActuel === "Mixte" ? questionMode : modeActuel).toLowerCase()
+  const palierIdx = stageParMode[modeKey] || 0
+  const isFinal = palierIdx === STAGES.length - 1
+  const timeLevel = timeLevelParMode[modeKey] || 0
+  const timeGoal = (TIME_THRESHOLDS[timeLevel] ?? TIME_THRESHOLDS[TIME_THRESHOLDS.length - 1]) * 1000
+  chronoEl.style.display = "block"
+  chronoStartAt = performance.now()
+  const updateChrono = () => {
+    const elapsed = performance.now() - chronoStartAt
+    const secs = elapsed / 1000
+    chronoEl.textContent = `${secs.toFixed(2)}s`
+    if (!isFinal) {
+      chronoEl.style.color = "#555"
+      return
+    }
+    if (elapsed <= timeGoal) {
+      chronoEl.style.color = "#3c704d"
+    } else if (elapsed <= timeGoal * 2) {
+      chronoEl.style.color = "#8b7a2b"
+    } else {
+      chronoEl.style.color = "#8a4f2c"
+    }
+  }
+  requestAnimationFrame(() => {
+    chronoStartAt = performance.now()
+    updateChrono()
+    chronoInterval = setInterval(updateChrono, 50)
+  })
 }
 
 /* ============================
@@ -1350,42 +1384,14 @@ function afficherCarte() {
   digits = []
   majAffichageDigits()
   majStats()
-  debutTemps = performance.now()
-
-  // Chrono visuel
-  clearInterval(chronoInterval)
-  const chronoEl = document.getElementById("chrono")
-  const modeKey = (modeActuel === "Mixte" ? questionMode : modeActuel).toLowerCase()
-  const palierIdx = stageParMode[modeKey] || 0
-  const isFinal = palierIdx === STAGES.length - 1
-  const timeLevel = timeLevelParMode[modeKey] || 0
-  const timeGoal = (TIME_THRESHOLDS[timeLevel] ?? TIME_THRESHOLDS[TIME_THRESHOLDS.length - 1]) * 1000
-  chronoEl.style.display = "block"
-  const updateChrono = () => {
-    const elapsed = performance.now() - debutTemps
-    const secs = elapsed / 1000
-    chronoEl.textContent = `${secs.toFixed(2)}s`
-    if (!isFinal) {
-      chronoEl.style.color = "#555"
-      return
-    }
-    if (elapsed <= timeGoal) {
-      chronoEl.style.color = "#3c704d"
-    } else if (elapsed <= timeGoal * 2) {
-      chronoEl.style.color = "#8b7a2b"
-    } else {
-      chronoEl.style.color = "#8a4f2c"
-    }
-  }
-  updateChrono()
-  chronoInterval = setInterval(updateChrono, 50)
+  initChrono()
 }
 
 function tenterValidation() {
   if (questionMode === "Dos" && (!valeurChoisie || !couleurChoisie)) return
   if (questionMode === "Face" && digits.length === 0) return
 
-  const temps = performance.now() - debutTemps
+  const temps = performance.now() - chronoStartAt
   let bon = false
   let reponse
 
