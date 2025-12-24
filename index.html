@@ -719,7 +719,7 @@ function charger() {
       thresholdParMode = { dos: 1, face: 1 }
     }
     weakHistory = new Set(sauvegarde.weakHistory || [])
-    nextDue = sauvegarde.nextDue || {}
+    nextDue = {}
   } else {
     creerDeck()
   }
@@ -731,8 +731,7 @@ function sauvegarder() {
     cartes,
     stageParMode,
     thresholdParMode,
-    weakHistory: Array.from(weakHistory),
-    nextDue
+    weakHistory: Array.from(weakHistory)
   }
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
   planifierSauvegardeCloud(data)
