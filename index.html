@@ -1451,12 +1451,12 @@ function tenterValidation() {
   majStats()
   const flash = document.getElementById("flash")
   flash.className = `flash ${bon ? "good" : "bad"} visible`
+  clearInterval(chronoInterval)
 
   if (bon) {
     pendingDelta = { delta, bon: true }
     setTimeout(() => {
       flash.classList.remove("visible")
-      clearInterval(chronoInterval)
       if (!stagePending) {
         prochaineCarte()
         setTimeout(() => {
