@@ -548,6 +548,7 @@ const SLOW = 3000
 const QC_EVERY = 10
 const QC_RATIO = 0.05 // 5%
 const ERROR_REPEAT_GOOD_REQUIRED = 1 // nb de bonnes réponses pour sortir de la queue chaude
+const HAPTIC_MS = 12
 
 /* ============================
    ÉTAT
@@ -603,6 +604,12 @@ function cheminCarte(carte) {
     file += "2"
   }
   return `CARDS/${file}.png`
+}
+
+function haptic() {
+  if (navigator.vibrate) {
+    navigator.vibrate(HAPTIC_MS)
+  }
 }
 
 /* ============================
@@ -837,7 +844,7 @@ function afficherBoutons() {
     groupe.forEach(val => {
       const b = document.createElement("button")
       b.textContent = val
-      b.onclick = () => { valeurChoisie = val; tenterValidation() }
+      b.onclick = () => { haptic(); valeurChoisie = val; tenterValidation() }
       ligne.appendChild(b)
     })
     v.appendChild(ligne)
@@ -846,7 +853,7 @@ function afficherBoutons() {
   COULEURS.forEach(col => {
     const b = document.createElement("button")
     b.textContent = col
-    b.onclick = () => { couleurChoisie = col; tenterValidation() }
+    b.onclick = () => { haptic(); couleurChoisie = col; tenterValidation() }
     b.classList.add("suit")
     b.classList.add(`suit-${SUIT_CLASSES[col]}`)
     b.dataset.symbole = SUIT_SYMBOLS[col]
@@ -856,7 +863,7 @@ function afficherBoutons() {
   ;[1,2,3,4,5,6,7,8,9,0,"⌫","OK"].forEach(val => {
     const b = document.createElement("button")
     b.textContent = val
-    b.onclick = () => gererClavier(val)
+    b.onclick = () => { haptic(); gererClavier(val) }
     clavier.appendChild(b)
   })
 }
@@ -1392,11 +1399,11 @@ const burgerBtn = document.getElementById("burger")
 const menuPanel = document.getElementById("menu-panel")
 const resetBtn = document.getElementById("reset")
 const resetAllBtn = document.getElementById("reset-all")
-burgerBtn.addEventListener("click", (e) => { e.stopPropagation(); setMenu(!menuOuvert) })
+burgerBtn.addEventListener("click", (e) => { e.stopPropagation(); haptic(); setMenu(!menuOuvert) })
 menuPanel.addEventListener("click", (e) => e.stopPropagation())
 document.addEventListener("click", () => setMenu(false))
-resetBtn.addEventListener("click", (e) => { e.stopPropagation(); resetProgression() })
-resetAllBtn.addEventListener("click", (e) => { e.stopPropagation(); fullReset() })
+resetBtn.addEventListener("click", (e) => { e.stopPropagation(); haptic(); resetProgression() })
+resetAllBtn.addEventListener("click", (e) => { e.stopPropagation(); haptic(); fullReset() })
 setMenu(false)
 
 ensurePlayerId()
