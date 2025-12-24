@@ -1142,6 +1142,23 @@ function resetCycle() {
   timeLevelParMode = { dos: 0, face: 0 }
 }
 
+function resetPointsForMode(modeKey) {
+  cartes.forEach(c => {
+    const st = c.stats[modeKey]
+    if (!st) return
+    st.points = 0
+    st.vues = st.vues || 0
+    st.succes = st.succes || 0
+    st.echecs = st.echecs || 0
+    st.serie = 0
+    st.maitrise = 0
+    st.tempsMoyen = null
+    st.poids = calculPoids(st)
+  })
+  nextDue = {}
+  recentIds = []
+}
+
 async function chargerCloud() {
   try {
     const res = await fetch(`${API_BASE}/api/load?playerId=${encodeURIComponent(playerId)}`)
@@ -1380,11 +1397,10 @@ function prochaineCarte() {
     if (isFinalPalier) {
       if (timeLevel < TIME_THRESHOLDS.length - 1) {
         timeLevelParMode[modeKey] = timeLevel + 1
+        resetPointsForMode(modeKey)
         stagePending = true
-        nextDue = {}
-        recentIds = []
-        sauvegarder()
         const nextTime = TIME_THRESHOLDS[timeLevelParMode[modeKey]] ?? timeGoal
+        sauvegarder()
         showStageMessage(`Seuil ${timeGoal}s atteint (${questionMode}) → Nouveau seuil ${nextTime}s`)
         lancerConfetti()
         majStats()
@@ -1398,9 +1414,12 @@ function prochaineCarte() {
       }
     } else {
       stageParMode[modeKey] = palierIdx + 1
+      const nextPalier = STAGES[stageParMode[modeKey]]
+      if (nextPalier && nextPalier.start === 1) {
+        resetPointsForMode(modeKey)
+        timeLevelParMode[modeKey] = 0
+      }
       stagePending = true
-      nextDue = {}
-      recentIds = []
       sauvegarder()
       const next = STAGES[stageParMode[modeKey]]
       showStageMessage(`Palier ${palier.label} terminé (${questionMode}) → ${next.label}`)
