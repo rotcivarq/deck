@@ -1280,21 +1280,18 @@ function prochaineCarte() {
 
   const sortedPoints = Array.from(byPoint.keys()).sort((a, b) => a - b)
   let chosen = null
-  for (const p of sortedPoints) {
-    const ready = (byPoint.get(p) || []).filter(e => (e.due ?? 0) <= now)
-    if (ready.length) {
-      chosen = ready[Math.floor(Math.random() * ready.length)].card
-      break
-    }
-  }
-  if (!chosen) {
-    const lowest = byPoint.get(sortedPoints[0]) || []
-    if (lowest.length) {
-      lowest.sort((a, b) => (a.due ?? 0) - (b.due ?? 0))
-      chosen = lowest[0].card
+  const worstScore = sortedPoints[0]
+  const worstList = byPoint.get(worstScore) || []
+  if (worstList.length) {
+    const readyWorst = worstList.filter(e => (e.due ?? 0) <= now)
+    if (readyWorst.length) {
+      chosen = readyWorst[Math.floor(Math.random() * readyWorst.length)].card
     } else {
-      chosen = pool[0]
+      worstList.sort((a, b) => (a.due ?? 0) - (b.due ?? 0))
+      chosen = worstList[0].card
     }
+  } else {
+    chosen = pool[0]
   }
 
   if (!chosen) return
