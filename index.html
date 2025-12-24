@@ -397,6 +397,20 @@
     transition: transform 200ms ease;
   }
 
+  .chrono {
+    position: fixed;
+    top: 120px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 16px;
+    font-weight: 700;
+    padding: 6px 10px;
+    border-radius: 10px;
+    background: rgba(255,255,255,0.65);
+    box-shadow: 0 8px 18px rgba(0,0,0,0.12);
+    z-index: 8;
+  }
+
   .carte {
     width: 170px;
     height: 250px;
@@ -487,6 +501,7 @@
 <button id="lock-btn" class="lock-btn" aria-pressed="false" aria-label="Verrouiller le scroll">🔓</button>
 <div id="progress-label" class="progress-label">0%</div>
 <div class="progress-container"><div id="progress-bar" class="progress-bar"></div></div>
+<div id="chrono" class="chrono"></div>
 
 <h1>Memories</h1>
 <div id="subtitle" class="subtitle"></div>
@@ -636,6 +651,7 @@ let scrollLocked = false
 let touchBlocker = null
 let scrollTopBackup = 0
 let pendingDelta = null
+let chronoInterval = null
 
 function cheminCarte(carte) {
   const suitMap = {
@@ -939,16 +955,16 @@ function showDeltaBadge(delta, bon) {
   if (delta === null || delta === undefined) return
   const deltaEl = document.createElement("div")
   deltaEl.style.position = "fixed"
-  deltaEl.style.top = "45%"
-  deltaEl.style.left = "65%"
+  deltaEl.style.top = "18%"
+  deltaEl.style.left = "80%"
   deltaEl.style.transform = "translate(-50%, -50%)"
   deltaEl.style.fontSize = "28px"
   deltaEl.style.fontWeight = "800"
   deltaEl.style.padding = "6px 10px"
   deltaEl.style.borderRadius = "10px"
-  deltaEl.style.background = bon ? "rgba(0,170,60,0.18)" : "rgba(200,0,0,0.2)"
+  deltaEl.style.background = "transparent"
   deltaEl.style.color = bon ? "#0b7c2f" : "#b00020"
-  deltaEl.style.boxShadow = "0 8px 18px rgba(0,0,0,0.12)"
+  deltaEl.style.boxShadow = "none"
   deltaEl.style.zIndex = 1900
   deltaEl.style.transition = "transform 220ms ease, opacity 220ms ease"
   deltaEl.style.opacity = "0"
@@ -1331,6 +1347,35 @@ function afficherCarte() {
   majAffichageDigits()
   majStats()
   debutTemps = performance.now()
+
+  // Chrono visuel
+  clearInterval(chronoInterval)
+  const chronoEl = document.getElementById("chrono")
+  const modeKey = (modeActuel === "Mixte" ? questionMode : modeActuel).toLowerCase()
+  const palierIdx = stageParMode[modeKey] || 0
+  const isFinal = palierIdx === STAGES.length - 1
+  const timeLevel = timeLevelParMode[modeKey] || 0
+  const timeGoal = (TIME_THRESHOLDS[timeLevel] ?? TIME_THRESHOLDS[TIME_THRESHOLDS.length - 1]) * 1000
+  chronoEl.style.display = "block"
+  const updateChrono = () => {
+    const elapsed = performance.now() - debutTemps
+    const secs = elapsed / 1000
+    chronoEl.textContent = `${secs.toFixed(2)}s`
+    if (!isFinal) {
+      chronoEl.style.background = "rgba(255,255,255,0.65)"
+      chronoEl.style.color = "#0e0e0e"
+      return
+    }
+    if (elapsed <= timeGoal) {
+      chronoEl.style.color = "#0b7c2f"
+    } else if (elapsed <= timeGoal * 2) {
+      chronoEl.style.color = "#c7a600"
+    } else {
+      chronoEl.style.color = "#c05b00"
+    }
+  }
+  updateChrono()
+  chronoInterval = setInterval(updateChrono, 50)
 }
 
 function tenterValidation() {
@@ -1387,6 +1432,7 @@ function tenterValidation() {
     pendingDelta = { delta, bon: true }
     setTimeout(() => {
       flash.classList.remove("visible")
+      clearInterval(chronoInterval)
       if (!stagePending) {
         prochaineCarte()
         setTimeout(() => {
@@ -1402,6 +1448,7 @@ function tenterValidation() {
     const handler = () => {
       flash.classList.remove("visible")
       document.getElementById("overlay-correction").classList.remove("visible")
+      clearInterval(chronoInterval)
       document.removeEventListener("click", handler, true)
       if (!stagePending) prochaineCarte()
     }
