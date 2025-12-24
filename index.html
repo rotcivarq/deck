@@ -350,6 +350,17 @@
     z-index: 5;
   }
 
+  .progress-label {
+    position: fixed;
+    top: 56px;
+    right: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    color: #0e0e0e;
+    text-shadow: 0 1px 2px rgba(255,255,255,0.8);
+    z-index: 6;
+  }
+
   .progress-bar {
     width: 100%;
     height: 100%;
@@ -446,6 +457,7 @@
 <div id="stage-message" class="stage-message"></div>
 
 <button id="burger" class="burger" aria-expanded="false" aria-label="Ouvrir le menu">☰</button>
+<div id="progress-label" class="progress-label">0%</div>
 <div class="progress-container"><div id="progress-bar" class="progress-bar"></div></div>
 
 <h1>Memories</h1>
@@ -511,6 +523,9 @@ const MODES = ["Dos","Face","Mixte","Training"]
 const STATS_VERSION = "v2"
 const PLAYER_ID_KEY = "mnemo_player_id"
 const API_BASE = ""
+const POIDS_FAIBLE = 9
+const POIDS_MOYEN = 3
+const POIDS_FORT = 1
 const STAGES = (() => {
   const res = []
   const max = ORDERED_CARDS.length
@@ -530,8 +545,9 @@ const STAGES = (() => {
 const STORAGE_KEY = "memo_cartes_v1"
 const FAST = 800
 const SLOW = 3000
-const QC_EVERY = 7 // contrôle qualité régulier
-const QC_RATIO = 0.1 // 10% de cartes fortes en phase erreurs
+const QC_EVERY = 10
+const QC_RATIO = 0.05 // 5%
+const ERROR_REPEAT_GOOD_REQUIRED = 1 // nb de bonnes réponses pour sortir de la queue chaude
 
 /* ============================
    ÉTAT
@@ -562,6 +578,9 @@ let queueType = "full" // "full" ou "errors"
 let tiragesDepuisQC = 0
 let roundOk = 0
 let roundFail = 0
+let errorQueue = []
+let errorQueueNeeds = {}
+let carteDepuisHotQueue = false
 
 function cheminCarte(carte) {
   const suitMap = {
@@ -706,6 +725,26 @@ function calculPoids(stats) {
   if (scoreEffectif < 1) return 3 // faible
   if (scoreEffectif < 2) return 2 // moyen
   return 1 // fort
+}
+
+function pushErrorCard(id) {
+  if (!errorQueue.includes(id)) {
+    errorQueue.unshift(id)
+  }
+  errorQueueNeeds[id] = ERROR_REPEAT_GOOD_REQUIRED
+}
+
+function resolveErrorCard(id, bon) {
+  if (errorQueueNeeds[id] === undefined) return
+  if (!bon) {
+    errorQueueNeeds[id] = ERROR_REPEAT_GOOD_REQUIRED
+    return
+  }
+  errorQueueNeeds[id] -= 1
+  if (errorQueueNeeds[id] <= 0) {
+    errorQueue = errorQueue.filter(cId => cId !== id)
+    delete errorQueueNeeds[id]
+  }
 }
 
 function shuffle(arr) {
@@ -864,11 +903,17 @@ function majStats() {
   const ratio = totalPts / maxPts
   document.getElementById("stats").textContent =
     `Mode ${displayMode} · Niveau ${level} · Palier ${palier.label} · Points : ${stats.points} · Maîtrise : ${(stats.maitrise * 100).toFixed(0)} % · Poids : ${stats.poids.toFixed(2)}`
-  const phaseLabel = queueType === "errors" ? "Rattrapage erreurs" : "Passe complète"
+  const phaseLabel = errorQueue.length > 0
+    ? "Erreurs chaudes"
+    : queueType === "errors"
+      ? "Rattrapage erreurs"
+      : "Passe complète"
   const resume = lastFullSummary ? ` · Dernière passe : ${lastFullSummary.ok} réussies / ${lastFullSummary.fail} ratées` : ""
   document.getElementById("phase").textContent = `Phase : ${phaseLabel}${resume} · Round : ${roundOk} OK / ${roundFail} KO`
   const bar = document.getElementById("progress-bar")
   bar.style.transform = `scaleY(${ratio.toFixed(2)})`
+  const label = document.getElementById("progress-label")
+  label.textContent = `${Math.round(ratio * 100)}%`
 }
 
 function renderTraining() {
@@ -933,6 +978,9 @@ function resetCycle() {
   roundOk = 0
   roundFail = 0
   derniereCarte = null
+  errorQueue = []
+  errorQueueNeeds = {}
+  carteDepuisHotQueue = false
 }
 
 async function chargerCloud() {
@@ -1074,6 +1122,11 @@ function tenterValidation() {
   if (!bon && queueType === "full") {
     errorsThisRound.add(carteActuelle.id)
   }
+  if (!bon) {
+    pushErrorCard(carteActuelle.id)
+  } else if (errorQueueNeeds[carteActuelle.id] !== undefined) {
+    resolveErrorCard(carteActuelle.id, true)
+  }
   if (bon) roundOk++
   else roundFail++
 
@@ -1114,6 +1167,9 @@ function prochaineCarte() {
   }
   // si fin de palier en attente de clic, ne pas avancer
   if (stagePending) return
+  if (queueType === "hot" && errorQueue.length === 0) {
+    queueType = "full"
+  }
 
   questionMode =
     modeActuel === "Mixte"
@@ -1132,6 +1188,19 @@ function prochaineCarte() {
     errorsThisRound.clear()
     roundOk = 0
     roundFail = 0
+  }
+
+   // priorité aux erreurs récentes
+  if (errorQueue.length > 0) {
+    queueType = "hot"
+    const hotList = errorQueue
+      .map(id => pool.find(c => c.id === id) || cartes.find(c => c.id === id))
+      .filter(Boolean)
+    if (hotList.length) {
+      queueCartes = shuffle([...hotList])
+    } else {
+      queueType = "full"
+    }
   }
 
   while (queueCartes.length === 0) {
@@ -1180,12 +1249,14 @@ function prochaineCarte() {
         const moyens = pool.filter(c => (c.stats[modeKey]?.points ?? 0) === seuil)
         const forts = pool.filter(c => (c.stats[modeKey]?.points ?? 0) > seuil)
         const list = []
-        faibles.forEach(c => { list.push(c, c, c) })
-        moyens.forEach(c => { list.push(c, c) })
-        forts.forEach(c => { list.push(c) })
-        const qcCount = Math.max(1, Math.round(list.length * QC_RATIO))
-        for (let i = 0; i < qcCount && forts.length > 0; i++) {
-          list.push(forts[Math.floor(Math.random() * forts.length)])
+        faibles.forEach(c => { for (let i = 0; i < POIDS_FAIBLE; i++) list.push(c) })
+        moyens.forEach(c => { for (let i = 0; i < POIDS_MOYEN; i++) list.push(c) })
+        forts.forEach(c => { for (let i = 0; i < POIDS_FORT; i++) list.push(c) })
+        if (errorQueue.length === 0) {
+          const qcCount = Math.max(1, Math.round(list.length * QC_RATIO))
+          for (let i = 0; i < qcCount && forts.length > 0; i++) {
+            list.push(forts[Math.floor(Math.random() * forts.length)])
+          }
         }
         queueCartes = shuffle(list)
         errorsThisRound.clear()
@@ -1197,6 +1268,8 @@ function prochaineCarte() {
         if (seuil < 4) {
           thresholdParMode[modeKey] = seuil + 1
         }
+        errorQueue = []
+        errorQueueNeeds = {}
         queueType = "full"
         roundOk = 0
         roundFail = 0
@@ -1207,10 +1280,12 @@ function prochaineCarte() {
         roundFail = 0
         const forts = pool.filter(c => (c.stats[modeKey]?.points ?? 0) >= seuil)
         const list = []
-        retard.forEach(c => { list.push(c, c, c) })
-        const qcCount = Math.max(1, Math.round(list.length * QC_RATIO))
-        for (let i = 0; i < qcCount && forts.length > 0; i++) {
-          list.push(forts[Math.floor(Math.random() * forts.length)])
+        retard.forEach(c => { for (let i = 0; i < POIDS_FAIBLE; i++) list.push(c) })
+        if (errorQueue.length === 0) {
+          const qcCount = Math.max(1, Math.round(list.length * QC_RATIO))
+          for (let i = 0; i < qcCount && forts.length > 0; i++) {
+            list.push(forts[Math.floor(Math.random() * forts.length)])
+          }
         }
         queueCartes = shuffle(list)
         break
@@ -1229,6 +1304,7 @@ function prochaineCarte() {
   }
 
   carteActuelle = queueCartes.shift()
+  carteDepuisHotQueue = errorQueue.includes(carteActuelle.id)
   derniereCarte = carteActuelle
   afficherCarte()
 }
