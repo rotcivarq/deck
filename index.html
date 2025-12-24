@@ -1461,7 +1461,8 @@ function tenterValidation() {
       document.removeEventListener("click", handler, true)
       if (!stagePending) prochaineCarte()
     }
-    document.addEventListener("click", handler, true)
+    // Attendre la fin du clic courant pour ne pas auto-avancer
+    setTimeout(() => document.addEventListener("click", handler, true), 0)
   }
 }
 
