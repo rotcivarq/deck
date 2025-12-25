@@ -397,6 +397,25 @@
     transition: transform 200ms ease;
   }
 
+  .debug-overlay {
+    position: fixed;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 90%;
+    max-width: 420px;
+    max-height: 120px;
+    overflow-y: auto;
+    font-size: 11px;
+    font-family: "SFMono-Regular", Menlo, Consolas, monospace;
+    background: rgba(0,0,0,0.65);
+    color: #e6e6e6;
+    padding: 8px 10px;
+    border-radius: 10px;
+    box-shadow: 0 10px 22px rgba(0,0,0,0.2);
+    z-index: 1500;
+  }
+
   .chrono {
     position: fixed;
     top: calc(16px + env(safe-area-inset-top, 0px));
@@ -507,6 +526,7 @@
 <div id="progress-label" class="progress-label">0%</div>
 <div class="progress-container"><div id="progress-bar" class="progress-bar"></div></div>
 <div id="chrono" class="chrono"></div>
+<div id="debug" class="debug-overlay" style="display:none;"></div>
 
 <h1>Memories</h1>
 <div id="subtitle" class="subtitle"></div>
@@ -659,6 +679,8 @@ let chronoInterval = null
 let chronoStartAt = 0
 const preloadedFaces = new Set()
 let ignoreClicksUntil = 0
+let debugEnabled = true
+const debugBuffer = []
 
 function cheminCarte(carte) {
   const suitMap = {
@@ -700,6 +722,17 @@ function haptic() {
   if (navigator.vibrate) {
     navigator.vibrate(HAPTIC_MS)
   }
+}
+
+function debugLog(msg) {
+  if (!debugEnabled) return
+  const el = document.getElementById("debug")
+  if (!el) return
+  const time = Math.round(performance.now())
+  debugBuffer.push(`[${time}ms] ${msg}`)
+  if (debugBuffer.length > 50) debugBuffer.shift()
+  el.innerText = debugBuffer.slice(-10).join("\n")
+  el.style.display = "block"
 }
 
 function initChrono() {
@@ -1121,6 +1154,7 @@ function majAffichageDigits() {
 }
 
 function gererClavier(val) {
+  debugLog(`key ${val}`)
   if (val === "⌫") {
     digits.pop()
     majAffichageDigits()
