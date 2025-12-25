@@ -1497,9 +1497,9 @@ function afficherCarte() {
 
 function tenterValidation() {
   if (answering) return
-  answering = true
   if (questionMode === "Dos" && (!valeurChoisie || !couleurChoisie)) return
   if (questionMode === "Face" && digits.length === 0) return
+  answering = true
 
   const temps = performance.now() - chronoStartAt
   let bon = false
