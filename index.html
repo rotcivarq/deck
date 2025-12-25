@@ -681,6 +681,7 @@ const preloadedFaces = new Set()
 let ignoreClicksUntil = 0
 let debugEnabled = (typeof window !== "undefined") && (("ontouchstart" in window) || (navigator && navigator.maxTouchPoints > 0))
 const debugBuffer = []
+let answering = false
 function updateURLForMode() {
   if (typeof window === "undefined") return
   if (modeActuel === "Training") {
@@ -1474,9 +1475,12 @@ function afficherCarte() {
   majAffichageDigits()
   majStats()
   initChrono()
+  answering = false
 }
 
 function tenterValidation() {
+  if (answering) return
+  answering = true
   if (questionMode === "Dos" && (!valeurChoisie || !couleurChoisie)) return
   if (questionMode === "Face" && digits.length === 0) return
 
