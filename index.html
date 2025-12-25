@@ -1798,6 +1798,21 @@ chargerCloud().finally(() => {
 // Support clavier desktop
 document.addEventListener("keydown", (e) => {
   if (modeActuel === "Training") return
+  // après erreur, Enter doit pouvoir avancer
+  if (document.getElementById("overlay-correction").classList.contains("visible")) {
+    const handler = () => {
+      const flash = document.getElementById("flash")
+      flash.classList.remove("visible")
+      document.getElementById("overlay-correction").classList.remove("visible")
+      clearInterval(chronoInterval)
+      document.removeEventListener("keydown", handler)
+      if (!stagePending) prochaineCarte()
+    }
+    if (e.key === "Enter") {
+      handler()
+      return
+    }
+  }
   if (e.key >= "0" && e.key <= "9") {
     gererClavier(Number(e.key))
   } else if (e.key === "Backspace" || e.key === "Delete") {
