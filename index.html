@@ -682,17 +682,16 @@ let ignoreClicksUntil = 0
 let debugEnabled = true
 const debugBuffer = []
 function addTapHandlers(el, handler, label = "") {
-  const wrap = (e) => {
-    e.preventDefault()
+  const invoke = (type) => {
     const info = label || el.textContent || el.id || "btn"
-    debugLog(`${e.type} ${info}${el._tapLock ? " (blocked)" : ""}`)
+    debugLog(`${type} ${info}${el._tapLock ? " (blocked)" : ""}`)
     if (el._tapLock) return
     el._tapLock = true
     handler()
-    setTimeout(() => { el._tapLock = false }, 120)
+    setTimeout(() => { el._tapLock = false }, 140)
   }
-  el.addEventListener("pointerdown", wrap)
-  el.addEventListener("pointerup", wrap)
+  el.addEventListener("pointerdown", (e) => { e.preventDefault(); invoke("pointerdown") })
+  el.addEventListener("touchstart", (e) => { e.preventDefault(); invoke("touchstart") }, { passive: false })
   el.addEventListener("click", (e) => e.preventDefault())
 }
 
