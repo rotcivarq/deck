@@ -1097,7 +1097,7 @@ function afficherBoutons() {
       b.textContent = val
       const onTap = makeFastHandler(() => { haptic(); valeurChoisie = val; tenterValidation() })
       b.addEventListener("pointerdown", onTap)
-      b.addEventListener("click", onTap)
+      b.addEventListener("click", (e) => e.preventDefault())
       ligne.appendChild(b)
     })
     v.appendChild(ligne)
@@ -1108,7 +1108,7 @@ function afficherBoutons() {
     b.textContent = col
     const onTap = makeFastHandler(() => { haptic(); couleurChoisie = col; tenterValidation() })
     b.addEventListener("pointerdown", onTap)
-    b.addEventListener("click", onTap)
+    b.addEventListener("click", (e) => e.preventDefault())
     b.classList.add("suit")
     b.classList.add(`suit-${SUIT_CLASSES[col]}`)
     b.dataset.symbole = SUIT_SYMBOLS[col]
@@ -1120,7 +1120,7 @@ function afficherBoutons() {
     b.textContent = val
     const onTap = makeFastHandler(() => { haptic(); gererClavier(val) })
     b.addEventListener("pointerdown", onTap)
-    b.addEventListener("click", onTap)
+    b.addEventListener("click", (e) => e.preventDefault())
     clavier.appendChild(b)
   })
 }
