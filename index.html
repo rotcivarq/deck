@@ -660,6 +660,16 @@ let chronoInterval = null
 let chronoStartAt = 0
 const preloadedFaces = new Set()
 let ignoreClicksUntil = 0
+function makeFastHandler(handler) {
+  return (e) => {
+    e.preventDefault()
+    const last = e.currentTarget._lastFire || 0
+    const now = performance.now()
+    if (now - last < 50) return
+    e.currentTarget._lastFire = now
+    handler()
+  }
+}
 
 function cheminCarte(carte) {
   const suitMap = {
@@ -1085,7 +1095,9 @@ function afficherBoutons() {
     groupe.forEach(val => {
       const b = document.createElement("button")
       b.textContent = val
-      b.addEventListener("pointerdown", (e) => { e.preventDefault(); haptic(); valeurChoisie = val; tenterValidation() })
+      const onTap = makeFastHandler(() => { haptic(); valeurChoisie = val; tenterValidation() })
+      b.addEventListener("pointerdown", onTap)
+      b.addEventListener("click", onTap)
       ligne.appendChild(b)
     })
     v.appendChild(ligne)
@@ -1094,7 +1106,9 @@ function afficherBoutons() {
   COULEURS.forEach(col => {
     const b = document.createElement("button")
     b.textContent = col
-    b.addEventListener("pointerdown", (e) => { e.preventDefault(); haptic(); couleurChoisie = col; tenterValidation() })
+    const onTap = makeFastHandler(() => { haptic(); couleurChoisie = col; tenterValidation() })
+    b.addEventListener("pointerdown", onTap)
+    b.addEventListener("click", onTap)
     b.classList.add("suit")
     b.classList.add(`suit-${SUIT_CLASSES[col]}`)
     b.dataset.symbole = SUIT_SYMBOLS[col]
@@ -1104,7 +1118,9 @@ function afficherBoutons() {
   ;[1,2,3,4,5,6,7,8,9,0,"⌫","OK"].forEach(val => {
     const b = document.createElement("button")
     b.textContent = val
-    b.addEventListener("pointerdown", (e) => { e.preventDefault(); haptic(); gererClavier(val) })
+    const onTap = makeFastHandler(() => { haptic(); gererClavier(val) })
+    b.addEventListener("pointerdown", onTap)
+    b.addEventListener("click", onTap)
     clavier.appendChild(b)
   })
 }
