@@ -679,7 +679,7 @@ let chronoInterval = null
 let chronoStartAt = 0
 const preloadedFaces = new Set()
 let ignoreClicksUntil = 0
-let debugEnabled = (typeof window !== "undefined") && (("ontouchstart" in window) || (navigator && navigator.maxTouchPoints > 0))
+let debugEnabled = false
 const debugBuffer = []
 let answering = false
 let orderModePassDone = false
