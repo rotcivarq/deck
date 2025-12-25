@@ -587,7 +587,7 @@ const VALEUR_GROUPES = [
 const COULEURS = ["Pique","Cœur","Trèfle","Carreau"]
 const SUIT_SYMBOLS = { Pique: "♠", Cœur: "♥", Trèfle: "♣", Carreau: "♦" }
 const SUIT_CLASSES = { Pique: "pique", Cœur: "coeur", Trèfle: "trefle", Carreau: "carreau" }
-const MODES = ["Dos","Face","Mixte","Training"]
+const MODES = ["Dos","Face","Face Ordre","Mixte","Training"]
 const STATS_VERSION = "v2"
 const PLAYER_ID_KEY = "mnemo_player_id"
 const API_BASE = ""
@@ -682,6 +682,7 @@ let ignoreClicksUntil = 0
 let debugEnabled = (typeof window !== "undefined") && (("ontouchstart" in window) || (navigator && navigator.maxTouchPoints > 0))
 const debugBuffer = []
 let answering = false
+let orderModePassDone = false
 function updateURLForMode() {
   if (typeof window === "undefined") return
   if (modeActuel === "Training") {
@@ -1122,6 +1123,9 @@ function afficherBoutons() {
     b.onclick = (ev) => {
       ev.stopPropagation()
       modeActuel = m
+      if (modeActuel === "Face Ordre") {
+        orderModePassDone = false
+      }
       setMenu(false)
       afficherBoutons()
       if (modeActuel !== "Training") {
@@ -1316,6 +1320,7 @@ function resetCycle() {
   nextDue = {}
   recentIds = []
   timeLevelParMode = { dos: 0, face: 0 }
+  orderModePassDone = false
 }
 
 function resetPointsForMode(modeKey) {
@@ -1476,6 +1481,9 @@ function afficherCarte() {
   majStats()
   initChrono()
   answering = false
+  if (modeActuel === "Face Ordre") {
+    orderModePassDone = orderModePassDone // no-op for clarity
+  }
 }
 
 function tenterValidation() {
@@ -1573,11 +1581,30 @@ function prochaineCarte() {
   questionMode =
     modeActuel === "Mixte"
       ? (Math.random() < 0.5 ? "Dos" : "Face")
-      : (modeActuel === "Entrainement" ? "Dos" : modeActuel)
+      : (modeActuel === "Entrainement" ? "Dos" : (modeActuel === "Face Ordre" ? "Face" : modeActuel))
 
   const modeKey = questionMode.toLowerCase()
   const pool = cartesDuPalier(questionMode)
   if (!pool.length) return
+
+  // Mode face ordre : passe séquentielle obligatoire avant le rattrapage
+  if (modeActuel === "Face Ordre") {
+    if (!orderModePassDone && queueCartes.length === 0) {
+      queueCartes = [...pool].sort((a, b) => a.numero - b.numero)
+    }
+    if (queueCartes.length > 0) {
+      carteActuelle = queueCartes.shift()
+      derniereCarte = carteActuelle
+      sinceWeakInject++
+      questionCount++
+      recentIds.push(carteActuelle.id)
+      if (recentIds.length > 3) recentIds.shift()
+      afficherCarte()
+      return
+    } else {
+      orderModePassDone = true
+    }
+  }
 
   // Passage de palier / seuil temps
   const palierIdx = stageParMode[modeKey] || 0
@@ -1616,6 +1643,7 @@ function prochaineCarte() {
         resetPointsForMode(modeKey)
         timeLevelParMode[modeKey] = 0
       }
+      if (modeActuel === "Face Ordre") orderModePassDone = false
       stagePending = true
       sauvegarder()
       const next = STAGES[stageParMode[modeKey]]
@@ -1638,6 +1666,15 @@ function prochaineCarte() {
 
   const sortedPoints = Array.from(byPoint.keys()).sort((a, b) => a - b)
   let chosen = null
+
+  // Mode face ordre : passe séquentielle puis rattrapage classique
+  if (modeActuel === "Face Ordre" && !orderModePassDone) {
+    const ordered = [...pool].sort((a, b) => a.numero - b.numero)
+    queueCartes = ordered
+    orderModePassDone = true
+  }
+
+  // Si on vient de finir la queue séquentielle, on continue avec la logique normale (pire carte)
 
   // 1) Cherche une carte prête (due <= now) en partant du pire score, en excluant les 3 dernières
   for (const p of sortedPoints) {
