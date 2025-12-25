@@ -813,6 +813,7 @@ function statsVides() {
     serie: 0,
     maitrise: 0,
     tempsMoyen: null,
+    lastTimes: [],
     poids: 1
   }
 }
@@ -1053,6 +1054,13 @@ function majCarte(carte, mode, bon, temps) {
   stats.tempsMoyen = stats.tempsMoyen
     ? stats.tempsMoyen * (1 - alpha) + temps * alpha
     : temps
+  stats.lastTime = temps
+
+  // moyenne glissante sur les 2 dernières mesures
+  stats.lastTimes = stats.lastTimes || []
+  stats.lastTimes.push(temps)
+  if (stats.lastTimes.length > 2) stats.lastTimes.shift()
+  stats.tempsMoyen = stats.lastTimes.reduce((s, t) => s + t, 0) / stats.lastTimes.length
   stats.lastTime = temps
 
   const score = bon ? scoreTemps(temps) : 0
@@ -1334,6 +1342,7 @@ function resetPointsForMode(modeKey) {
     st.serie = 0
     st.maitrise = 0
     st.tempsMoyen = null
+    st.lastTimes = []
     st.poids = calculPoids(st)
   })
   nextDue = {}
@@ -1819,6 +1828,7 @@ function fullReset() {
       st.serie = 0
       st.maitrise = 0
       st.tempsMoyen = null
+      st.lastTimes = []
       st.poids = calculPoids(st)
     })
   })
