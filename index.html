@@ -124,12 +124,12 @@
 
   .numero-input {
     display: flex;
-    gap: 12px;
+    gap: 0;
   }
 
   .digit-box {
-    width: 44px;
-    height: 54px;
+    width: 120px;
+    height: 60px;
     border-radius: 10px;
     background: #ffffff;
     border: 1px solid rgba(0,0,0,0.08);
@@ -526,8 +526,7 @@
 
 <div id="numeric-zone" class="numeric">
   <div id="numero-input" class="numero-input">
-    <span class="digit-box" data-idx="0">–</span>
-    <span class="digit-box" data-idx="1">–</span>
+    <span class="digit-box" data-idx="0">––</span>
   </div>
   <div id="clavier" class="clavier"></div>
 </div>
@@ -1117,9 +1116,8 @@ function afficherBoutons() {
 
 function majAffichageDigits() {
   const boxes = document.querySelectorAll(".digit-box")
-  boxes.forEach((box, idx) => {
-    box.textContent = digits[idx] !== undefined ? digits[idx] : "–"
-  })
+  const str = digits.length ? digits.join("") : "––"
+  boxes.forEach((box) => { box.textContent = str })
 }
 
 function gererClavier(val) {
