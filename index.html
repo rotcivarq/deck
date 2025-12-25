@@ -1253,16 +1253,18 @@ function renderTraining() {
     }))
     .sort((a, b) => a.total - b.total || a.carte.numero - b.carte.numero)
 
+  const fmtPts = (n) => n == null ? "–" : (Number.isInteger(n) ? n : n.toFixed(1))
+  const fmtTime = (n) => n == null ? "–" : (n < 1000 ? `${n.toFixed(0)} ms` : `${(n/1000).toFixed(2)} s`)
+
   const rows = sorted.map(item => {
     const cls = item.total <= 2 ? "score-low" : item.total < 8 ? "score-mid" : "score-high"
-    const fmt = (n) => n == null ? "–" : (n < 1000 ? `${n.toFixed(0)} ms` : `${(n/1000).toFixed(2)} s`)
     return `
       <tr>
         <td>${item.carte.numero}</td>
         <td>${item.carte.valeur} de ${item.carte.couleur}</td>
-        <td class="${cls}">${fmt(item.total)}</td>
-        <td>${fmt(item.facePts)}<br><small>${fmt(item.faceTime)}</small></td>
-        <td>${fmt(item.dosPts)}<br><small>${fmt(item.dosTime)}</small></td>
+        <td class="${cls}">${fmtPts(item.total)}</td>
+        <td>${fmtPts(item.facePts)}<br><small>${fmtTime(item.faceTime)}</small></td>
+        <td>${fmtPts(item.dosPts)}<br><small>${fmtTime(item.dosTime)}</small></td>
       </tr>
     `
   }).join("")
