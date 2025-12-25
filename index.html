@@ -708,7 +708,7 @@ function addTapHandlers(el, handler, label = "") {
     if (el._tapLock) return
     el._tapLock = true
     handler()
-    setTimeout(() => { el._tapLock = false }, 140)
+    setTimeout(() => { el._tapLock = false }, 40)
   }
   el.addEventListener("pointerdown", (e) => { e.preventDefault(); invoke("pointerdown") })
   el.addEventListener("touchstart", (e) => { e.preventDefault(); invoke("touchstart") }, { passive: false })
