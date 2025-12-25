@@ -679,7 +679,7 @@ let chronoInterval = null
 let chronoStartAt = 0
 const preloadedFaces = new Set()
 let ignoreClicksUntil = 0
-let debugEnabled = true
+let debugEnabled = (typeof window !== "undefined") && (("ontouchstart" in window) || (navigator && navigator.maxTouchPoints > 0))
 const debugBuffer = []
 function addTapHandlers(el, handler, label = "") {
   const invoke = (type) => {
