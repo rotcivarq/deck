@@ -681,9 +681,11 @@ const preloadedFaces = new Set()
 let ignoreClicksUntil = 0
 let debugEnabled = true
 const debugBuffer = []
-function addTapHandlers(el, handler) {
+function addTapHandlers(el, handler, label = "") {
   const wrap = (e) => {
     e.preventDefault()
+    const info = label || el.textContent || el.id || "btn"
+    debugLog(`${e.type} ${info}${el._tapLock ? " (blocked)" : ""}`)
     if (el._tapLock) return
     el._tapLock = true
     handler()
@@ -1130,7 +1132,7 @@ function afficherBoutons() {
       const b = document.createElement("button")
       b.textContent = val
       const handler = () => { haptic(); valeurChoisie = val; tenterValidation() }
-      addTapHandlers(b, handler)
+      addTapHandlers(b, handler, `val ${val}`)
       ligne.appendChild(b)
     })
     v.appendChild(ligne)
@@ -1140,7 +1142,7 @@ function afficherBoutons() {
     const b = document.createElement("button")
     b.textContent = col
     const handler = () => { haptic(); couleurChoisie = col; tenterValidation() }
-    addTapHandlers(b, handler)
+    addTapHandlers(b, handler, `suit ${col}`)
     b.classList.add("suit")
     b.classList.add(`suit-${SUIT_CLASSES[col]}`)
     b.dataset.symbole = SUIT_SYMBOLS[col]
@@ -1151,7 +1153,7 @@ function afficherBoutons() {
     const b = document.createElement("button")
     b.textContent = val
     const handler = () => { haptic(); gererClavier(val) }
-    addTapHandlers(b, handler)
+    addTapHandlers(b, handler, `key ${val}`)
     clavier.appendChild(b)
   })
 }
