@@ -681,6 +681,18 @@ const preloadedFaces = new Set()
 let ignoreClicksUntil = 0
 let debugEnabled = true
 const debugBuffer = []
+function addTapHandlers(el, handler) {
+  const wrap = (e) => {
+    e.preventDefault()
+    if (el._tapLock) return
+    el._tapLock = true
+    handler()
+    setTimeout(() => { el._tapLock = false }, 120)
+  }
+  el.addEventListener("pointerdown", wrap)
+  el.addEventListener("pointerup", wrap)
+  el.addEventListener("click", (e) => e.preventDefault())
+}
 
 function cheminCarte(carte) {
   const suitMap = {
@@ -1118,8 +1130,7 @@ function afficherBoutons() {
       const b = document.createElement("button")
       b.textContent = val
       const handler = () => { haptic(); valeurChoisie = val; tenterValidation() }
-      b.addEventListener("pointerdown", (e) => { e.preventDefault(); handler() })
-      b.addEventListener("click", (e) => e.preventDefault())
+      addTapHandlers(b, handler)
       ligne.appendChild(b)
     })
     v.appendChild(ligne)
@@ -1129,8 +1140,7 @@ function afficherBoutons() {
     const b = document.createElement("button")
     b.textContent = col
     const handler = () => { haptic(); couleurChoisie = col; tenterValidation() }
-    b.addEventListener("pointerdown", (e) => { e.preventDefault(); handler() })
-    b.addEventListener("click", (e) => e.preventDefault())
+    addTapHandlers(b, handler)
     b.classList.add("suit")
     b.classList.add(`suit-${SUIT_CLASSES[col]}`)
     b.dataset.symbole = SUIT_SYMBOLS[col]
@@ -1141,8 +1151,7 @@ function afficherBoutons() {
     const b = document.createElement("button")
     b.textContent = val
     const handler = () => { haptic(); gererClavier(val) }
-    b.addEventListener("pointerdown", (e) => { e.preventDefault(); handler() })
-    b.addEventListener("click", (e) => e.preventDefault())
+    addTapHandlers(b, handler)
     clavier.appendChild(b)
   })
 }
