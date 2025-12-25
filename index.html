@@ -587,7 +587,7 @@ const VALEUR_GROUPES = [
 const COULEURS = ["Pique","Cœur","Trèfle","Carreau"]
 const SUIT_SYMBOLS = { Pique: "♠", Cœur: "♥", Trèfle: "♣", Carreau: "♦" }
 const SUIT_CLASSES = { Pique: "pique", Cœur: "coeur", Trèfle: "trefle", Carreau: "carreau" }
-const MODES = ["Dos","Face","Face Ordre","Mixte","Training"]
+const MODES = ["Dos","Dos Ordre","Face","Mixte","Training"]
 const STATS_VERSION = "v2"
 const PLAYER_ID_KEY = "mnemo_player_id"
 const API_BASE = ""
@@ -1131,7 +1131,7 @@ function afficherBoutons() {
     b.onclick = (ev) => {
       ev.stopPropagation()
       modeActuel = m
-      if (modeActuel === "Face Ordre") {
+      if (modeActuel === "Dos Ordre") {
         orderModePassDone = false
       }
       setMenu(false)
@@ -1590,14 +1590,14 @@ function prochaineCarte() {
   questionMode =
     modeActuel === "Mixte"
       ? (Math.random() < 0.5 ? "Dos" : "Face")
-      : (modeActuel === "Entrainement" ? "Dos" : (modeActuel === "Face Ordre" ? "Face" : modeActuel))
+      : (modeActuel === "Entrainement" ? "Dos" : (modeActuel === "Dos Ordre" ? "Dos" : modeActuel))
 
   const modeKey = questionMode.toLowerCase()
   const pool = cartesDuPalier(questionMode)
   if (!pool.length) return
 
-  // Mode face ordre : passe séquentielle obligatoire avant le rattrapage
-  if (modeActuel === "Face Ordre") {
+  // Mode dos ordre : passe séquentielle obligatoire avant le rattrapage
+  if (modeActuel === "Dos Ordre") {
     if (!orderModePassDone && queueCartes.length === 0) {
       queueCartes = [...pool].sort((a, b) => a.numero - b.numero)
     }
@@ -1652,7 +1652,7 @@ function prochaineCarte() {
         resetPointsForMode(modeKey)
         timeLevelParMode[modeKey] = 0
       }
-      if (modeActuel === "Face Ordre") orderModePassDone = false
+      if (modeActuel === "Dos Ordre") orderModePassDone = false
       stagePending = true
       sauvegarder()
       const next = STAGES[stageParMode[modeKey]]
