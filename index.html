@@ -681,6 +681,24 @@ const preloadedFaces = new Set()
 let ignoreClicksUntil = 0
 let debugEnabled = (typeof window !== "undefined") && (("ontouchstart" in window) || (navigator && navigator.maxTouchPoints > 0))
 const debugBuffer = []
+function updateURLForMode() {
+  if (typeof window === "undefined") return
+  if (modeActuel === "Training") {
+    history.replaceState(null, "", "#training")
+  } else if (window.location.hash === "#training") {
+    history.replaceState(null, "", window.location.pathname + window.location.search)
+  }
+}
+
+function initModeFromURL() {
+  if (typeof window === "undefined") return
+  const hash = window.location.hash
+  const search = new URLSearchParams(window.location.search)
+  if (hash === "#training" || search.get("training") === "1") {
+    modeActuel = "Training"
+  }
+}
+
 function addTapHandlers(el, handler, label = "") {
   const invoke = (type) => {
     const info = label || el.textContent || el.id || "btn"
@@ -1108,6 +1126,7 @@ function afficherBoutons() {
       if (modeActuel !== "Training") {
         prochaineCarte()
       }
+      updateURLForMode()
     }
     menu.appendChild(b)
   })
@@ -1787,6 +1806,7 @@ setMenu(false)
 setScrollLock(false)
 
 ensurePlayerId()
+initModeFromURL()
 charger()
 chargerCloud().finally(() => {
   preloadAllFaces()
