@@ -1086,7 +1086,7 @@ function afficherBoutons() {
       const b = document.createElement("button")
       b.textContent = val
       const handler = () => { haptic(); valeurChoisie = val; tenterValidation() }
-      b.addEventListener("pointerdown", (e) => { e.preventDefault(); handler() })
+      b.addEventListener("pointerup", (e) => { e.preventDefault(); handler() })
       b.addEventListener("click", (e) => e.preventDefault())
       ligne.appendChild(b)
     })
@@ -1097,7 +1097,7 @@ function afficherBoutons() {
     const b = document.createElement("button")
     b.textContent = col
     const handler = () => { haptic(); couleurChoisie = col; tenterValidation() }
-    b.addEventListener("pointerdown", (e) => { e.preventDefault(); handler() })
+    b.addEventListener("pointerup", (e) => { e.preventDefault(); handler() })
     b.addEventListener("click", (e) => e.preventDefault())
     b.classList.add("suit")
     b.classList.add(`suit-${SUIT_CLASSES[col]}`)
@@ -1109,7 +1109,7 @@ function afficherBoutons() {
     const b = document.createElement("button")
     b.textContent = val
     const handler = () => { haptic(); gererClavier(val) }
-    b.addEventListener("pointerdown", (e) => { e.preventDefault(); handler() })
+    b.addEventListener("pointerup", (e) => { e.preventDefault(); handler() })
     b.addEventListener("click", (e) => e.preventDefault())
     clavier.appendChild(b)
   })
