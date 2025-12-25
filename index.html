@@ -1180,19 +1180,22 @@ function renderTraining() {
       carte: c,
       facePts: c.stats.face.points || 0,
       dosPts: c.stats.dos.points || 0,
-      total: (c.stats.face.points || 0) + (c.stats.dos.points || 0)
+      total: (c.stats.face.points || 0) + (c.stats.dos.points || 0),
+      faceTime: c.stats.face.tempsMoyen,
+      dosTime: c.stats.dos.tempsMoyen
     }))
     .sort((a, b) => a.total - b.total || a.carte.numero - b.carte.numero)
 
   const rows = sorted.map(item => {
     const cls = item.total <= 2 ? "score-low" : item.total < 8 ? "score-mid" : "score-high"
+    const fmt = (n) => n == null ? "–" : (n < 1000 ? `${n.toFixed(0)} ms` : `${(n/1000).toFixed(2)} s`)
     return `
       <tr>
         <td>${item.carte.numero}</td>
         <td>${item.carte.valeur} de ${item.carte.couleur}</td>
         <td class="${cls}">${fmt(item.total)}</td>
-        <td>${fmt(item.facePts)}</td>
-        <td>${fmt(item.dosPts)}</td>
+        <td>${fmt(item.facePts)}<br><small>${fmt(item.faceTime)}</small></td>
+        <td>${fmt(item.dosPts)}<br><small>${fmt(item.dosTime)}</small></td>
       </tr>
     `
   }).join("")
