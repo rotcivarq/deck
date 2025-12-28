@@ -690,11 +690,24 @@ let debugEnabled = false
 const debugBuffer = []
 let answering = false
 let orderModePassDone = false
+const isTouchDevice = (typeof window !== "undefined") && (("ontouchstart" in window) || (navigator && navigator.maxTouchPoints > 0))
+let lockMemory = false
+let dosOrdreTimerStart = null
+let dosOrdrePassCount = 0
+let dosOrdreBest = null
 function updateURLForMode() {
   if (typeof window === "undefined") return
-  if (modeActuel === "Training") {
-    history.replaceState(null, "", "#training")
-  } else if (window.location.hash === "#training") {
+  const map = {
+    "Dos": "#dos",
+    "Dos Ordre": "#dos-ordre",
+    "Face": "#face",
+    "Mixte": "#mixte",
+    "Training": "#training"
+  }
+  const target = map[modeActuel] || ""
+  if (target) {
+    history.replaceState(null, "", target)
+  } else {
     history.replaceState(null, "", window.location.pathname + window.location.search)
   }
 }
@@ -703,9 +716,11 @@ function initModeFromURL() {
   if (typeof window === "undefined") return
   const hash = window.location.hash
   const search = new URLSearchParams(window.location.search)
-  if (hash === "#training" || search.get("training") === "1") {
-    modeActuel = "Training"
-  }
+  if (hash === "#training" || search.get("training") === "1") modeActuel = "Training"
+  else if (hash === "#dos-ordre") modeActuel = "Dos Ordre"
+  else if (hash === "#face") modeActuel = "Face"
+  else if (hash === "#mixte") modeActuel = "Mixte"
+  else if (hash === "#dos") modeActuel = "Dos"
 }
 
 function addTapHandlers(el, handler, label = "") {
@@ -785,7 +800,9 @@ function initChrono() {
   const timeGoal = (TIME_THRESHOLDS[timeLevel] ?? TIME_THRESHOLDS[TIME_THRESHOLDS.length - 1]) * 1000
   chronoEl.style.display = "block"
   const updateChrono = () => {
-    const elapsed = performance.now() - chronoStartAt
+    const baseStart = (modeActuel === "Dos Ordre" && dosOrdreTimerStart) ? dosOrdreTimerStart : chronoStartAt
+    if (!baseStart) return
+    const elapsed = performance.now() - baseStart
     const secs = elapsed / 1000
     chronoEl.textContent = `${secs.toFixed(2)}s`
     if (!isFinal) {
@@ -801,7 +818,12 @@ function initChrono() {
     }
   }
   setTimeout(() => {
-    chronoStartAt = performance.now()
+    if (modeActuel === "Dos Ordre") {
+      if (!dosOrdreTimerStart) dosOrdreTimerStart = performance.now()
+      chronoStartAt = dosOrdreTimerStart
+    } else {
+      chronoStartAt = performance.now()
+    }
     updateChrono()
     chronoInterval = setInterval(updateChrono, 50)
   }, 500)
@@ -905,6 +927,7 @@ function charger() {
     } else {
       timeLevelParMode = { dos: 0, face: 0 }
     }
+    dosOrdreBest = sauvegarde.dosOrdreBest ?? null
   } else {
     creerDeck()
   }
@@ -917,7 +940,8 @@ function sauvegarder() {
     stageParMode,
     thresholdParMode,
     weakHistory: Array.from(weakHistory),
-    timeLevelParMode
+    timeLevelParMode,
+    dosOrdreBest
   }
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
   planifierSauvegardeCloud(data)
@@ -953,6 +977,22 @@ function gapForScore(score) {
     }
   }
   return randInt(5, 10)
+}
+
+function buildTimeFocusQueue(pool, modeKey, timeGoal) {
+  const slow = pool.filter(c => (c.stats[modeKey]?.tempsMoyen ?? Infinity) > timeGoal)
+  const fast = pool.filter(c => (c.stats[modeKey]?.tempsMoyen ?? 0) <= timeGoal)
+  const list = []
+  if (slow.length === 0) return []
+  const fastIfAny = fast.length ? fast : pool
+  slow.forEach(card => {
+    list.push(card)
+    const fillerCount = randInt(3, 7)
+    for (let i = 0; i < fillerCount; i++) {
+      list.push(fastIfAny[Math.floor(Math.random() * fastIfAny.length)])
+    }
+  })
+  return list
 }
 
 function scheduleHot(id, repeats = HOT_REPEAT) {
@@ -1125,6 +1165,7 @@ function afficherBoutons() {
   const menu = document.getElementById("menu")
   const clavier = document.getElementById("clavier")
   const training = document.getElementById("training")
+  const lockBtn = document.getElementById("lock-btn")
   v.innerHTML = ""
   c.innerHTML = ""
   menu.innerHTML = ""
@@ -1157,6 +1198,16 @@ function afficherBoutons() {
   document.getElementById("couleurs").style.display = showTraining ? "none" : "flex"
   document.getElementById("carte").style.display = showTraining ? "none" : "flex"
   training.classList.toggle("visible", showTraining)
+  if (!isTouchDevice || showTraining) {
+    lockBtn.style.display = "none"
+    if (showTraining) {
+      lockMemory = scrollLocked
+      setScrollLock(false)
+    }
+  } else {
+    lockBtn.style.display = "block"
+    setScrollLock(lockMemory)
+  }
 
   if (showTraining) {
     renderTraining()
@@ -1242,12 +1293,15 @@ function majStats() {
   const isFinalPalier = palierIdx === STAGES.length - 1
   const timeLevel = timeLevelParMode[modeKey] || 0
   const timeGoal = TIME_THRESHOLDS[timeLevel] ?? TIME_THRESHOLDS[TIME_THRESHOLDS.length - 1]
+  const bestText = (modeActuel === "Dos Ordre" && dosOrdreBest)
+    ? ` · Best : ${(dosOrdreBest/1000).toFixed(2)}s`
+    : ""
   const timeInfo =
     isFinalPalier
       ? ` · Temps cible ≤ ${timeGoal}s`
       : ""
   document.getElementById("stats").textContent =
-    `Mode ${displayMode} · Niveau ${level} · Palier ${palier.label} · Points : ${stats.points} · Maîtrise : ${(stats.maitrise * 100).toFixed(0)} % · Poids : ${stats.poids.toFixed(2)}${timeInfo}`
+    `Mode ${displayMode} · Niveau ${level} · Palier ${palier.label} · Points : ${stats.points} · Maîtrise : ${(stats.maitrise * 100).toFixed(0)} % · Poids : ${stats.poids.toFixed(2)}${timeInfo}${bestText}`
   const subtitle = document.getElementById("subtitle")
   if (subtitle) {
     subtitle.textContent = isFinalPalier
@@ -1339,6 +1393,8 @@ function resetCycle() {
   recentIds = []
   timeLevelParMode = { dos: 0, face: 0 }
   orderModePassDone = false
+  dosOrdreTimerStart = null
+  dosOrdrePassCount = 0
 }
 
 function resetPointsForMode(modeKey) {
@@ -1433,6 +1489,7 @@ function setScrollLock(lock) {
 function setMenu(open) {
   const panel = document.getElementById("menu-panel")
   const burger = document.getElementById("burger")
+  const lockBtn = document.getElementById("lock-btn")
   menuOuvert = open
   if (menuOuvert) {
     panel.classList.remove("hidden")
@@ -1444,6 +1501,11 @@ function setMenu(open) {
     burger.setAttribute("aria-expanded", "false")
     clearTimeout(menuTimeout)
     menuTimeout = null
+  }
+  if (!isTouchDevice || modeActuel === "Training") {
+    lockBtn.style.display = "none"
+  } else {
+    lockBtn.style.display = "block"
   }
 }
 
@@ -1551,6 +1613,12 @@ function tenterValidation() {
     const correction = document.getElementById("overlay-correction")
     correction.textContent = carteActuelle.numero
     correction.classList.add("visible")
+    if (modeActuel === "Dos Ordre") {
+      dosOrdreTimerStart = null
+      dosOrdrePassCount = 0
+      queueCartes = []
+      orderModePassDone = false
+    }
   }
 
   majStats()
@@ -1606,10 +1674,11 @@ function prochaineCarte() {
   const pool = cartesDuPalier(questionMode)
   if (!pool.length) return
 
-  // Mode dos ordre : passe séquentielle obligatoire avant le rattrapage
+  // Mode dos ordre : passe séquentielle obligatoire 2 fois d'affilée sans erreur
   if (modeActuel === "Dos Ordre") {
     if (!orderModePassDone && queueCartes.length === 0) {
       queueCartes = [...pool].sort((a, b) => a.numero - b.numero)
+      if (!dosOrdreTimerStart) dosOrdreTimerStart = performance.now()
     }
     if (queueCartes.length > 0) {
       carteActuelle = queueCartes.shift()
@@ -1621,7 +1690,27 @@ function prochaineCarte() {
       afficherCarte()
       return
     } else {
-      orderModePassDone = true
+      dosOrdrePassCount++
+      if (dosOrdrePassCount >= 2) {
+        const elapsed = dosOrdreTimerStart ? (performance.now() - dosOrdreTimerStart) : 0
+        if (!dosOrdreBest || elapsed < dosOrdreBest) {
+          dosOrdreBest = elapsed
+          sauvegarder()
+        }
+        showStageMessage(`Dos Ordre réussi : ${(elapsed/1000).toFixed(2)}s · Best ${(dosOrdreBest/1000).toFixed(2)}s`)
+        clearInterval(chronoInterval)
+        dosOrdreTimerStart = null
+        dosOrdrePassCount = 0
+        queueCartes = []
+        orderModePassDone = false
+        answering = false
+        return
+      } else {
+        queueCartes = [...pool].sort((a, b) => a.numero - b.numero)
+        answering = false
+        afficherCarte()
+        return
+      }
     }
   }
 
@@ -1636,6 +1725,12 @@ function prochaineCarte() {
     const t = c.stats[modeKey]?.tempsMoyen
     return t !== null && t !== undefined && t <= timeGoal * 1000
   })
+  if (isFinalPalier && palierCompletPoints && !palierCompletTemps && queueCartes.length === 0) {
+    const timeQueue = buildTimeFocusQueue(pool, modeKey, timeGoal * 1000)
+    if (timeQueue.length) {
+      queueCartes = shuffle(timeQueue)
+    }
+  }
   if (palierCompletPoints && palierCompletTemps) {
     if (isFinalPalier) {
       if (timeLevel < TIME_THRESHOLDS.length - 1) {
