@@ -1284,15 +1284,25 @@ function majStats() {
   const palier = STAGES[palierIdx] || STAGES[STAGES.length - 1]
   const level = palierIdx + 1
   const pool = cartesDuPalier(modeKey === "mixte" ? questionMode : questionMode)
-  const maxPts = pool.length * 4 || 1
-  const totalPts = pool.reduce((s, c) => {
-    const p = c.stats[modeKey]?.points ?? 0
-    return s + Math.max(0, Math.min(4, p))
-  }, 0)
-  const ratio = totalPts / maxPts
+  const maxPts = pool.length * 5 || 1
+  const palierIdx = stageParMode[modeKey] || 0
   const isFinalPalier = palierIdx === STAGES.length - 1
   const timeLevel = timeLevelParMode[modeKey] || 0
   const timeGoal = TIME_THRESHOLDS[timeLevel] ?? TIME_THRESHOLDS[TIME_THRESHOLDS.length - 1]
+  const totalPts = pool.reduce((s, c) => {
+    let p = c.stats[modeKey]?.points ?? 0
+    p = Math.max(0, Math.min(5, p))
+    if (isFinalPalier) {
+      const t = c.stats[modeKey]?.tempsMoyen
+      if (t === null || t === undefined || t > timeGoal * 1000) {
+        // pénalise la jauge si le temps n'est pas encore sous le seuil
+        p = Math.min(p, 4)
+      }
+    }
+    return s + p
+  }, 0)
+  const ratio = totalPts / maxPts
+  const isFinalPalier = palierIdx === STAGES.length - 1
   const bestText = (modeActuel === "Dos Ordre" && dosOrdreBest)
     ? ` · Best : ${(dosOrdreBest/1000).toFixed(2)}s`
     : ""
