@@ -333,6 +333,13 @@
     transform: translateY(-1px);
   }
 
+  .selected-choice {
+    background: #0d0d0d !important;
+    color: #ffffff !important;
+    border-color: #0d0d0d !important;
+    box-shadow: 0 8px 18px rgba(0,0,0,0.22) !important;
+  }
+
   .suit {
     min-width: 140px;
     font-weight: 700;
@@ -695,6 +702,8 @@ let lockMemory = false
 let dosOrdreTimerStart = null
 let dosOrdrePassCount = 0
 let dosOrdreBest = null
+let valeurBtns = []
+let couleurBtns = []
 function updateURLForMode() {
   if (typeof window === "undefined") return
   const map = {
@@ -1171,6 +1180,8 @@ function afficherBoutons() {
   menu.innerHTML = ""
   clavier.innerHTML = ""
   training.innerHTML = ""
+  valeurBtns = []
+  couleurBtns = []
 
   MODES.forEach(m => {
     const b = document.createElement("button")
@@ -1220,9 +1231,18 @@ function afficherBoutons() {
     groupe.forEach(val => {
       const b = document.createElement("button")
       b.textContent = val
-      const handler = () => { haptic(); valeurChoisie = val; tenterValidation() }
+      const handler = () => {
+        haptic()
+        valeurChoisie = val
+        if (questionMode === "Dos" || modeActuel.startsWith("Dos")) {
+          valeurBtns.forEach(btn => btn.classList.remove("selected-choice"))
+          b.classList.add("selected-choice")
+        }
+        tenterValidation()
+      }
       addTapHandlers(b, handler, `val ${val}`)
       ligne.appendChild(b)
+      valeurBtns.push(b)
     })
     v.appendChild(ligne)
   })
@@ -1238,6 +1258,7 @@ function afficherBoutons() {
     b.classList.add(`suit-${SUIT_CLASSES[col]}`)
     b.dataset.symbole = SUIT_SYMBOLS[col]
     grid.appendChild(b)
+    couleurBtns.push(b)
   })
   c.appendChild(grid)
 
@@ -1568,17 +1589,32 @@ function afficherCarte() {
   valeurChoisie = null
   couleurChoisie = null
   digits = []
+  valeurBtns.forEach(btn => btn.classList.remove("selected-choice"))
+  couleurBtns.forEach(btn => btn.classList.remove("selected-choice"))
   majAffichageDigits()
   majStats()
   initChrono()
   answering = false
-  if (modeActuel === "Face Ordre") {
+  if (modeActuel === "Dos Ordre") {
     orderModePassDone = orderModePassDone // no-op for clarity
   }
 }
 
 function tenterValidation() {
   if (answering) return
+  // mode dos : applique les sélections visuelles
+  if (questionMode === "Dos" || modeActuel.startsWith("Dos")) {
+    if (valeurChoisie) {
+      valeurBtns.forEach(btn => {
+        btn.classList.toggle("selected-choice", btn.textContent === valeurChoisie)
+      })
+    }
+    if (couleurChoisie) {
+      couleurBtns.forEach(btn => {
+        btn.classList.toggle("selected-choice", btn.textContent === couleurChoisie)
+      })
+    }
+  }
   if (questionMode === "Dos" && (!valeurChoisie || !couleurChoisie)) return
   if (questionMode === "Face" && digits.length === 0) return
   answering = true
@@ -1985,6 +2021,7 @@ chargerCloud().finally(() => {
 // Support clavier desktop
 document.addEventListener("keydown", (e) => {
   if (modeActuel === "Training") return
+  const isDosMode = questionMode === "Dos" || modeActuel.startsWith("Dos")
   // après erreur, Enter doit pouvoir avancer
   if (document.getElementById("overlay-correction").classList.contains("visible")) {
     const handler = () => {
@@ -2000,6 +2037,26 @@ document.addEventListener("keydown", (e) => {
       return
     }
   }
+
+  // Raccourcis Dos : 1-13 pour As-Roi, a/z/q/s pour Pique/Cœur/Trèfle/Carreau
+  if (isDosMode) {
+    const n = parseInt(e.key, 10)
+    if (!isNaN(n) && n >= 1 && n <= 13) {
+      valeurChoisie = VALEURS[n - 1]
+      valeurBtns.forEach(btn => btn.classList.toggle("selected-choice", btn.textContent === valeurChoisie))
+      tenterValidation()
+      return
+    }
+    const suitMap = { a: "Pique", z: "Cœur", q: "Trèfle", s: "Carreau" }
+    const suit = suitMap[e.key.toLowerCase()]
+    if (suit) {
+      couleurChoisie = suit
+      couleurBtns.forEach(btn => btn.classList.toggle("selected-choice", btn.textContent === couleurChoisie))
+      tenterValidation()
+      return
+    }
+  }
+
   if (e.key >= "0" && e.key <= "9") {
     gererClavier(Number(e.key))
   } else if (e.key === "Backspace" || e.key === "Delete") {
