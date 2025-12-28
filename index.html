@@ -1306,7 +1306,6 @@ function majStats() {
   const level = palierIdx + 1
   const pool = cartesDuPalier(modeKey === "mixte" ? questionMode : questionMode)
   const maxPts = pool.length * 5 || 1
-  const palierIdx = stageParMode[modeKey] || 0
   const isFinalPalier = palierIdx === STAGES.length - 1
   const timeLevel = timeLevelParMode[modeKey] || 0
   const timeGoal = TIME_THRESHOLDS[timeLevel] ?? TIME_THRESHOLDS[TIME_THRESHOLDS.length - 1]
@@ -1323,7 +1322,6 @@ function majStats() {
     return s + p
   }, 0)
   const ratio = totalPts / maxPts
-  const isFinalPalier = palierIdx === STAGES.length - 1
   const bestText = (modeActuel === "Dos Ordre" && dosOrdreBest)
     ? ` · Best : ${(dosOrdreBest/1000).toFixed(2)}s`
     : ""
