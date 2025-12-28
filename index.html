@@ -704,6 +704,8 @@ let dosOrdrePassCount = 0
 let dosOrdreBest = null
 let valeurBtns = []
 let couleurBtns = []
+let dosValueBuffer = ""
+let dosValueBufferTime = 0
 function updateURLForMode() {
   if (typeof window === "undefined") return
   const map = {
@@ -1589,6 +1591,8 @@ function afficherCarte() {
   digits = []
   valeurBtns.forEach(btn => btn.classList.remove("selected-choice"))
   couleurBtns.forEach(btn => btn.classList.remove("selected-choice"))
+  dosValueBuffer = ""
+  dosValueBufferTime = 0
   majAffichageDigits()
   majStats()
   initChrono()
@@ -1661,8 +1665,10 @@ function tenterValidation() {
       dosOrdreTimerStart = null
       dosOrdrePassCount = 0
       queueCartes = []
-      orderModePassDone = false
-    }
+  orderModePassDone = false
+  dosValueBuffer = ""
+  dosValueBufferTime = 0
+}
   }
 
   majStats()
@@ -2036,16 +2042,28 @@ document.addEventListener("keydown", (e) => {
     }
   }
 
-  // Raccourcis Dos : 1-13 pour As-Roi, a/z/q/s pour Pique/Cœur/Trèfle/Carreau
+  // Raccourcis Dos : 1-13 pour As-Roi, a/e/q/d pour Pique/Cœur/Trèfle/Carreau
   if (isDosMode) {
-    const n = parseInt(e.key, 10)
-    if (!isNaN(n) && n >= 1 && n <= 13) {
-      valeurChoisie = VALEURS[n - 1]
-      valeurBtns.forEach(btn => btn.classList.toggle("selected-choice", btn.textContent === valeurChoisie))
-      tenterValidation()
-      return
+    const now = Date.now()
+    if (now - dosValueBufferTime > 800) {
+      dosValueBuffer = ""
     }
-    const suitMap = { a: "Pique", z: "Cœur", q: "Trèfle", s: "Carreau" }
+    dosValueBufferTime = now
+    const digit = parseInt(e.key, 10)
+    if (!isNaN(digit)) {
+      dosValueBuffer += digit.toString()
+      const n = parseInt(dosValueBuffer, 10)
+      if (!isNaN(n) && n >= 1 && n <= 13) {
+        valeurChoisie = VALEURS[n - 1]
+        valeurBtns.forEach(btn => btn.classList.toggle("selected-choice", btn.textContent === valeurChoisie))
+        tenterValidation()
+        return
+      } else {
+        // si buffer invalide, garde seulement le dernier digit
+        dosValueBuffer = digit.toString()
+      }
+    }
+    const suitMap = { a: "Pique", e: "Cœur", q: "Trèfle", d: "Carreau" }
     const suit = suitMap[e.key.toLowerCase()]
     if (suit) {
       couleurChoisie = suit
