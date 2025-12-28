@@ -308,6 +308,13 @@
     gap: 8px;
   }
 
+  .couleurs-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(120px, 1fr));
+    gap: 8px;
+    justify-items: center;
+  }
+
   button {
     padding: 12px 16px;
     font-size: 15px;
@@ -1169,6 +1176,8 @@ function afficherBoutons() {
     v.appendChild(ligne)
   })
 
+  const grid = document.createElement("div")
+  grid.classList.add("couleurs-grid")
   COULEURS.forEach(col => {
     const b = document.createElement("button")
     b.textContent = col
@@ -1177,8 +1186,9 @@ function afficherBoutons() {
     b.classList.add("suit")
     b.classList.add(`suit-${SUIT_CLASSES[col]}`)
     b.dataset.symbole = SUIT_SYMBOLS[col]
-    c.appendChild(b)
+    grid.appendChild(b)
   })
+  c.appendChild(grid)
 
   ;[1,2,3,4,5,6,7,8,9,0,"⌫","OK"].forEach(val => {
     const b = document.createElement("button")
