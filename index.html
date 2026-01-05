@@ -1954,6 +1954,8 @@ function resetProgression() {
     const st = c.stats[modeKey]
     if (!st) return
     st.points = 0
+    st.tempsMoyen = null
+    st.lastTimes = []
     st.poids = calculPoids(st)
   })
   thresholdParMode[modeKey] = 1
