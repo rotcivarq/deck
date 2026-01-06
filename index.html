@@ -726,6 +726,7 @@ let dosOrdreTimerStart = null
 let dosOrdrePassCount = 0
 let dosOrdreBest = { asc: null, desc: null }
 let dosOrdreDirection = "asc"
+let dosOrdreRunActive = false
 let valeurBtns = []
 let couleurBtns = []
 let dosValueBuffer = ""
@@ -1228,6 +1229,10 @@ function afficherBoutons() {
       modeActuel = m
       if (modeActuel === "Dos Ordre") {
         orderModePassDone = false
+        dosOrdreTimerStart = null
+        dosOrdrePassCount = 0
+        dosOrdreRunActive = false
+        queueCartes = []
       }
       setMenu(false)
       afficherBoutons()
@@ -1470,6 +1475,7 @@ function resetCycle() {
   orderModePassDone = false
   dosOrdreTimerStart = null
   dosOrdrePassCount = 0
+  dosOrdreRunActive = false
 }
 
 function resetPointsForMode(modeKey) {
@@ -1718,10 +1724,9 @@ function tenterValidation() {
       dosOrdreTimerStart = null
       dosOrdrePassCount = 0
       queueCartes = []
-  orderModePassDone = false
-  dosValueBuffer = ""
-  dosValueBufferTime = 0
-}
+      orderModePassDone = false
+      dosOrdreRunActive = false
+    }
   }
 
   majStats()
@@ -1779,10 +1784,11 @@ function prochaineCarte() {
 
   // Mode dos ordre : passe séquentielle obligatoire 1 fois sans erreur
   if (modeActuel === "Dos Ordre") {
-    if (!orderModePassDone && queueCartes.length === 0) {
+    if (!dosOrdreRunActive) {
       const sorted = [...pool].sort((a, b) => a.numero - b.numero)
       queueCartes = dosOrdreDirection === "desc" ? sorted.reverse() : sorted
-      if (!dosOrdreTimerStart) dosOrdreTimerStart = performance.now()
+      dosOrdreTimerStart = performance.now()
+      dosOrdreRunActive = true
     }
     if (queueCartes.length > 0) {
       carteActuelle = queueCartes.shift()
@@ -1793,19 +1799,22 @@ function prochaineCarte() {
       if (recentIds.length > 3) recentIds.shift()
       afficherCarte()
       return
-    } else {
+    }
+    if (dosOrdreRunActive) {
       dosOrdrePassCount++
       const elapsed = dosOrdreTimerStart ? (performance.now() - dosOrdreTimerStart) : 0
-        const bestKey = dosOrdreDirection === "desc" ? "desc" : "asc"
-        if (!dosOrdreBest[bestKey] || elapsed < dosOrdreBest[bestKey]) {
-          dosOrdreBest[bestKey] = elapsed
-          sauvegarder()
-        }
-        const bestValue = dosOrdreBest[bestKey]
-        showStageMessage(`Dos Ordre réussi : ${(elapsed/1000).toFixed(2)}s · Best ${(bestValue/1000).toFixed(2)}s`)
+      const bestKey = dosOrdreDirection === "desc" ? "desc" : "asc"
+      if (elapsed > 0 && (!dosOrdreBest[bestKey] || elapsed < dosOrdreBest[bestKey])) {
+        dosOrdreBest[bestKey] = elapsed
+        sauvegarder()
+      }
+      const bestValue = dosOrdreBest[bestKey] || elapsed
+      stagePending = true
+      showStageMessage(`Dos Ordre réussi : ${(elapsed/1000).toFixed(2)}s · Best ${(bestValue/1000).toFixed(2)}s`)
       clearInterval(chronoInterval)
       dosOrdreTimerStart = null
       dosOrdrePassCount = 0
+      dosOrdreRunActive = false
       queueCartes = []
       orderModePassDone = false
       answering = false
