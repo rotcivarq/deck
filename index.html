@@ -752,6 +752,8 @@ let debutTemps = 0
 let modeActuel = "Face"
 const INPUT_MODE_KEY = "memories_input_mode"
 let inputMode = localStorage.getItem(INPUT_MODE_KEY) || "clic"
+let tapLastInputAt = 0
+let tapValidationAt = 0
 let menuOuvert = false
 let menuTimeout = null
 let questionMode = "Face"
@@ -1833,7 +1835,10 @@ function afficherCarte() {
   correction.textContent = ""
   document.getElementById("stage-message").classList.remove("visible")
   const tapInput = document.getElementById("tap-input")
-  if (tapInput) tapInput.value = ""
+  if (tapInput) {
+    const shouldKeep = inputMode === "tap" && modeActuel.startsWith("Dos") && tapLastInputAt > tapValidationAt
+    if (!shouldKeep) tapInput.value = ""
+  }
   valeurChoisie = null
   couleurChoisie = null
   digits = []
@@ -1869,6 +1874,9 @@ function tenterValidation() {
     }
   }
   if (questionMode === "Dos" && (!valeurChoisie || !couleurChoisie)) return
+  if (questionMode === "Dos" && inputMode === "tap" && modeActuel.startsWith("Dos")) {
+    tapValidationAt = Date.now()
+  }
   if (questionMode === "Face" && digits.length === 0) return
   answering = true
 
@@ -2296,6 +2304,9 @@ tapInputField.addEventListener("keydown", (e) => {
       tenterValidation()
     }
   }
+})
+tapInputField.addEventListener("input", () => {
+  tapLastInputAt = Date.now()
 })
 setMenu(false)
 setScrollLock(false)
