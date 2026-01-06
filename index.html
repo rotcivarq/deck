@@ -112,6 +112,24 @@
     box-shadow: 0 10px 22px rgba(0,0,0,0.12);
   }
 
+  .ordre-toggle {
+    display: none;
+    align-items: center;
+    gap: 8px;
+    justify-content: center;
+    margin: 6px auto 10px;
+  }
+
+  .ordre-toggle label {
+    font-size: 12px;
+    font-weight: 700;
+    color: #3d3d3d;
+  }
+
+  .ordre-toggle input[type="range"] {
+    width: 120px;
+  }
+
   .numeric {
     display: none;
     flex-direction: column;
@@ -547,6 +565,11 @@
 
 <div id="menu-panel" class="menu-panel hidden">
   <div id="menu" class="menu"></div>
+  <div id="ordre-toggle" class="ordre-toggle">
+    <label>1→52</label>
+    <input id="ordre-range" type="range" min="0" max="1" step="1" value="0" />
+    <label>52→1</label>
+  </div>
   <button id="reset" style="margin-top:8px; width:100%;">Reset memory</button>
   <button id="reset-all" style="margin-top:6px; width:100%;">Full reset (palier 1)</button>
  </div>
@@ -701,7 +724,8 @@ const isTouchDevice = (typeof window !== "undefined") && (("ontouchstart" in win
 let lockMemory = false
 let dosOrdreTimerStart = null
 let dosOrdrePassCount = 0
-let dosOrdreBest = null
+let dosOrdreBest = { asc: null, desc: null }
+let dosOrdreDirection = "asc"
 let valeurBtns = []
 let couleurBtns = []
 let dosValueBuffer = ""
@@ -938,7 +962,15 @@ function charger() {
     } else {
       timeLevelParMode = { dos: 0, face: 0 }
     }
-    dosOrdreBest = sauvegarde.dosOrdreBest ?? null
+    if (sauvegarde.dosOrdreBest && typeof sauvegarde.dosOrdreBest === "object") {
+      dosOrdreBest = {
+        asc: sauvegarde.dosOrdreBest.asc ?? null,
+        desc: sauvegarde.dosOrdreBest.desc ?? null
+      }
+    } else {
+      dosOrdreBest = { asc: sauvegarde.dosOrdreBest ?? null, desc: null }
+    }
+    dosOrdreDirection = sauvegarde.dosOrdreDirection || "asc"
   } else {
     creerDeck()
   }
@@ -952,7 +984,8 @@ function sauvegarder() {
     thresholdParMode,
     weakHistory: Array.from(weakHistory),
     timeLevelParMode,
-    dosOrdreBest
+    dosOrdreBest,
+    dosOrdreDirection
   }
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
   planifierSauvegardeCloud(data)
@@ -1176,6 +1209,7 @@ function afficherBoutons() {
   const menu = document.getElementById("menu")
   const clavier = document.getElementById("clavier")
   const training = document.getElementById("training")
+  const ordreToggle = document.getElementById("ordre-toggle")
   const lockBtn = document.getElementById("lock-btn")
   v.innerHTML = ""
   c.innerHTML = ""
@@ -1211,6 +1245,11 @@ function afficherBoutons() {
   document.getElementById("couleurs").style.display = showTraining ? "none" : "flex"
   document.getElementById("carte").style.display = showTraining ? "none" : "flex"
   training.classList.toggle("visible", showTraining)
+  ordreToggle.style.display = modeActuel === "Dos Ordre" ? "flex" : "none"
+  if (modeActuel === "Dos Ordre") {
+    const range = document.getElementById("ordre-range")
+    range.value = dosOrdreDirection === "desc" ? "1" : "0"
+  }
   if (!isTouchDevice || showTraining) {
     lockBtn.style.display = "none"
     if (showTraining) {
@@ -1324,20 +1363,25 @@ function majStats() {
     return s + p
   }, 0)
   const ratio = totalPts / maxPts
-  const bestText = (modeActuel === "Dos Ordre" && dosOrdreBest)
-    ? ` · Best : ${(dosOrdreBest/1000).toFixed(2)}s`
+  const bestValue = modeActuel === "Dos Ordre" ? dosOrdreBest[dosOrdreDirection] : null
+  const bestText = (modeActuel === "Dos Ordre" && bestValue)
+    ? ` · Best : ${(bestValue/1000).toFixed(2)}s`
     : ""
   const timeInfo =
     isFinalPalier
       ? ` · Temps cible ≤ ${timeGoal}s`
       : ""
   document.getElementById("stats").textContent =
-    `Mode ${displayMode} · Niveau ${level} · Palier ${palier.label} · Points : ${stats.points} · Maîtrise : ${(stats.maitrise * 100).toFixed(0)} % · Poids : ${stats.poids.toFixed(2)}${timeInfo}${bestText}`
+    (modeActuel === "Dos Ordre")
+      ? `Dos Ordre ${dosOrdreDirection === "asc" ? "1→52" : "52→1"} · Best ${(bestValue ? (bestValue/1000).toFixed(2) : "—")}s`
+      : `Mode ${displayMode} · Niveau ${level} · Palier ${palier.label} · Points : ${stats.points} · Maîtrise : ${(stats.maitrise * 100).toFixed(0)} % · Poids : ${stats.poids.toFixed(2)}${timeInfo}${bestText}`
   const subtitle = document.getElementById("subtitle")
   if (subtitle) {
-    subtitle.textContent = isFinalPalier
-      ? `Palier ${palier.label} · Seuil temps ${timeGoal}s`
-      : `Palier ${palier.label}`
+    subtitle.textContent = (modeActuel === "Dos Ordre")
+      ? `Dos Ordre ${dosOrdreDirection === "asc" ? "1→52" : "52→1"} · Best ${(bestValue ? (bestValue/1000).toFixed(2) : "—")}s`
+      : (isFinalPalier
+        ? `Palier ${palier.label} · Seuil temps ${timeGoal}s`
+        : `Palier ${palier.label}`)
   }
   const bar = document.getElementById("progress-bar")
   bar.style.transform = `scaleY(${ratio.toFixed(2)})`
@@ -1474,6 +1518,15 @@ async function chargerCloud() {
           dos: data.timeLevelParMode.dos ?? 0,
           face: data.timeLevelParMode.face ?? 0
         }
+      }
+      if (data.dosOrdreBest && typeof data.dosOrdreBest === "object") {
+        dosOrdreBest = {
+          asc: data.dosOrdreBest.asc ?? null,
+          desc: data.dosOrdreBest.desc ?? null
+        }
+      }
+      if (data.dosOrdreDirection) {
+        dosOrdreDirection = data.dosOrdreDirection
       }
       sauvegarder()
     }
@@ -1724,10 +1777,11 @@ function prochaineCarte() {
   const pool = cartesDuPalier(questionMode)
   if (!pool.length) return
 
-  // Mode dos ordre : passe séquentielle obligatoire 2 fois d'affilée sans erreur
+  // Mode dos ordre : passe séquentielle obligatoire 1 fois sans erreur
   if (modeActuel === "Dos Ordre") {
     if (!orderModePassDone && queueCartes.length === 0) {
-      queueCartes = [...pool].sort((a, b) => a.numero - b.numero)
+      const sorted = [...pool].sort((a, b) => a.numero - b.numero)
+      queueCartes = dosOrdreDirection === "desc" ? sorted.reverse() : sorted
       if (!dosOrdreTimerStart) dosOrdreTimerStart = performance.now()
     }
     if (queueCartes.length > 0) {
@@ -1741,26 +1795,21 @@ function prochaineCarte() {
       return
     } else {
       dosOrdrePassCount++
-      if (dosOrdrePassCount >= 2) {
-        const elapsed = dosOrdreTimerStart ? (performance.now() - dosOrdreTimerStart) : 0
-        if (!dosOrdreBest || elapsed < dosOrdreBest) {
-          dosOrdreBest = elapsed
+      const elapsed = dosOrdreTimerStart ? (performance.now() - dosOrdreTimerStart) : 0
+        const bestKey = dosOrdreDirection === "desc" ? "desc" : "asc"
+        if (!dosOrdreBest[bestKey] || elapsed < dosOrdreBest[bestKey]) {
+          dosOrdreBest[bestKey] = elapsed
           sauvegarder()
         }
-        showStageMessage(`Dos Ordre réussi : ${(elapsed/1000).toFixed(2)}s · Best ${(dosOrdreBest/1000).toFixed(2)}s`)
-        clearInterval(chronoInterval)
-        dosOrdreTimerStart = null
-        dosOrdrePassCount = 0
-        queueCartes = []
-        orderModePassDone = false
-        answering = false
-        return
-      } else {
-        queueCartes = [...pool].sort((a, b) => a.numero - b.numero)
-        answering = false
-        afficherCarte()
-        return
-      }
+        const bestValue = dosOrdreBest[bestKey]
+        showStageMessage(`Dos Ordre réussi : ${(elapsed/1000).toFixed(2)}s · Best ${(bestValue/1000).toFixed(2)}s`)
+      clearInterval(chronoInterval)
+      dosOrdreTimerStart = null
+      dosOrdrePassCount = 0
+      queueCartes = []
+      orderModePassDone = false
+      answering = false
+      return
     }
   }
 
@@ -2006,12 +2055,23 @@ const menuPanel = document.getElementById("menu-panel")
 const resetBtn = document.getElementById("reset")
 const resetAllBtn = document.getElementById("reset-all")
 const lockBtn = document.getElementById("lock-btn")
+const ordreRange = document.getElementById("ordre-range")
 burgerBtn.addEventListener("click", (e) => { e.stopPropagation(); haptic(); setMenu(!menuOuvert) })
 menuPanel.addEventListener("click", (e) => e.stopPropagation())
 document.addEventListener("click", () => setMenu(false))
 resetBtn.addEventListener("click", (e) => { e.stopPropagation(); haptic(); resetProgression() })
 resetAllBtn.addEventListener("click", (e) => { e.stopPropagation(); haptic(); fullReset() })
 lockBtn.addEventListener("click", (e) => { e.stopPropagation(); haptic(); setScrollLock(!scrollLocked) })
+ordreRange.addEventListener("input", (e) => {
+  dosOrdreDirection = e.target.value === "1" ? "desc" : "asc"
+  orderModePassDone = false
+  queueCartes = []
+  dosOrdreTimerStart = null
+  dosOrdrePassCount = 0
+  sauvegarder()
+  majStats()
+  if (modeActuel === "Dos Ordre") prochaineCarte()
+})
 setMenu(false)
 setScrollLock(false)
 
