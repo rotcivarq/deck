@@ -31,6 +31,8 @@
   }
 
   .best-score {
+    text-align: center;
+    display: block;
     font-size: 14px;
     color: #5a5a5a;
     margin-top: -12px;
@@ -1591,7 +1593,7 @@ function majStats() {
   const subtitle = document.getElementById("subtitle")
   if (subtitle) {
     subtitle.textContent = (modeActuel === "Dos Ordre")
-      ? `Dos Ordre ${dosOrdreDirection === "asc" ? "1→52" : "52→1"} · Best ${(bestValue ? (bestValue/1000).toFixed(2) : "—")}s`
+      ? `Dos Ordre ${dosOrdreDirection === "asc" ? "1→52" : "52→1"}`
       : (isFinalPalier
         ? `Palier ${palier.label} · Seuil temps ${timeGoal}s`
         : `Palier ${palier.label}`)
@@ -1599,7 +1601,7 @@ function majStats() {
   const bestScoreEl = document.getElementById("best-score")
   if (bestScoreEl) {
     bestScoreEl.textContent = (modeActuel === "Dos Ordre")
-      ? `Best chrono ${dosOrdreDirection === "asc" ? "1→52" : "52→1"} : ${(bestValue ? (bestValue/1000).toFixed(2) : "—")}s`
+      ? `Best chrono : ${(bestValue ? (bestValue/1000).toFixed(2) : "—")}s`
       : ""
   }
   const bar = document.getElementById("progress-bar")
