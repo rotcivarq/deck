@@ -1600,9 +1600,15 @@ function majStats() {
   }
   const bestScoreEl = document.getElementById("best-score")
   if (bestScoreEl) {
-    const ascText = dosOrdreBest.asc ? (dosOrdreBest.asc/1000).toFixed(2) : "—"
-    const descText = dosOrdreBest.desc ? (dosOrdreBest.desc/1000).toFixed(2) : "—"
-    bestScoreEl.textContent = `Best chrono 1→52 : ${ascText}s · 52→1 : ${descText}s`
+    if (modeActuel === "Dos Ordre") {
+      const ascText = dosOrdreBest.asc ? (dosOrdreBest.asc/1000).toFixed(2) : "—"
+      const descText = dosOrdreBest.desc ? (dosOrdreBest.desc/1000).toFixed(2) : "—"
+      bestScoreEl.textContent = `Best chrono 1→52 : ${ascText}s · 52→1 : ${descText}s`
+      bestScoreEl.style.display = "block"
+    } else {
+      bestScoreEl.textContent = ""
+      bestScoreEl.style.display = "none"
+    }
   }
   const bar = document.getElementById("progress-bar")
   bar.style.transform = `scaleY(${ratio.toFixed(2)})`
