@@ -1600,9 +1600,9 @@ function majStats() {
   }
   const bestScoreEl = document.getElementById("best-score")
   if (bestScoreEl) {
-    bestScoreEl.textContent = (modeActuel === "Dos Ordre")
-      ? `Best chrono : ${(bestValue ? (bestValue/1000).toFixed(2) : "—")}s`
-      : ""
+    const ascText = dosOrdreBest.asc ? (dosOrdreBest.asc/1000).toFixed(2) : "—"
+    const descText = dosOrdreBest.desc ? (dosOrdreBest.desc/1000).toFixed(2) : "—"
+    bestScoreEl.textContent = `Best chrono 1→52 : ${ascText}s · 52→1 : ${descText}s`
   }
   const bar = document.getElementById("progress-bar")
   bar.style.transform = `scaleY(${ratio.toFixed(2)})`
