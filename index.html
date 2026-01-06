@@ -30,6 +30,13 @@
     margin-bottom: 20px;
   }
 
+  .best-score {
+    font-size: 14px;
+    color: #5a5a5a;
+    margin-top: -12px;
+    margin-bottom: 20px;
+  }
+
   .burger {
     position: fixed;
     top: 16px;
@@ -634,6 +641,7 @@
 
 <h1>Memories</h1>
 <div id="subtitle" class="subtitle"></div>
+<div id="best-score" class="best-score"></div>
 
 <div id="menu-panel" class="menu-panel hidden">
   <div id="menu" class="menu"></div>
@@ -1487,6 +1495,20 @@ function matchValueToken(token) {
     if (n === 12) return "Dame"
     if (n === 13) return "Roi"
   }
+  const wordNumberMap = {
+    un: "As",
+    une: "As",
+    deux: "2",
+    trois: "3",
+    quatre: "4",
+    cinq: "5",
+    six: "6",
+    sept: "7",
+    huit: "8",
+    neuf: "9",
+    dix: "10"
+  }
+  if (wordNumberMap[token]) return wordNumberMap[token]
   const valueMap = [
     { word: "as", value: "As" },
     { word: "valet", value: "Valet" },
@@ -1573,6 +1595,12 @@ function majStats() {
       : (isFinalPalier
         ? `Palier ${palier.label} · Seuil temps ${timeGoal}s`
         : `Palier ${palier.label}`)
+  }
+  const bestScoreEl = document.getElementById("best-score")
+  if (bestScoreEl) {
+    bestScoreEl.textContent = (modeActuel === "Dos Ordre")
+      ? `Best chrono ${dosOrdreDirection === "asc" ? "1→52" : "52→1"} : ${(bestValue ? (bestValue/1000).toFixed(2) : "—")}s`
+      : ""
   }
   const bar = document.getElementById("progress-bar")
   bar.style.transform = `scaleY(${ratio.toFixed(2)})`
