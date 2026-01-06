@@ -117,7 +117,6 @@
     align-items: center;
     gap: 8px;
     justify-content: center;
-    margin: 6px auto 10px;
   }
 
   .ordre-toggle label {
@@ -128,6 +127,66 @@
 
   .ordre-toggle input[type="range"] {
     width: 120px;
+  }
+
+  .left-controls {
+    position: fixed;
+    left: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    align-items: center;
+    z-index: 12;
+  }
+
+  .input-toggle {
+    display: none;
+    align-items: center;
+    gap: 8px;
+    justify-content: center;
+    background: rgba(255,255,255,0.9);
+    border: 1px solid rgba(0,0,0,0.08);
+    border-radius: 999px;
+    padding: 6px 10px;
+    box-shadow: 0 12px 24px rgba(0,0,0,0.12);
+  }
+
+  .input-toggle label {
+    font-size: 12px;
+    font-weight: 700;
+    color: #3d3d3d;
+  }
+
+  .input-toggle input[type="range"] {
+    width: 90px;
+  }
+
+  .tap-zone {
+    display: none;
+    align-items: center;
+    gap: 8px;
+    margin: 10px auto 6px;
+    justify-content: center;
+  }
+
+  .tap-zone input {
+    width: min(320px, 78vw);
+    padding: 10px 14px;
+    border-radius: 999px;
+    border: 1px solid rgba(0,0,0,0.12);
+    font-size: 16px;
+    background: #ffffff;
+  }
+
+  .tap-zone button {
+    border-radius: 999px;
+    padding: 10px 16px;
+    font-weight: 700;
+    background: #111111;
+    color: #ffffff;
+    border: none;
   }
 
   .numeric {
@@ -560,16 +619,24 @@
 <div id="chrono" class="chrono"></div>
 <div id="debug" class="debug-overlay" style="display:none;"></div>
 
-<h1>Memories</h1>
-<div id="subtitle" class="subtitle"></div>
-
-<div id="menu-panel" class="menu-panel hidden">
-  <div id="menu" class="menu"></div>
+<div id="left-controls" class="left-controls">
+  <div id="input-toggle" class="input-toggle">
+    <label>Clic</label>
+    <input id="input-range" type="range" min="0" max="1" step="1" value="0" />
+    <label>Tap</label>
+  </div>
   <div id="ordre-toggle" class="ordre-toggle">
     <label>1→52</label>
     <input id="ordre-range" type="range" min="0" max="1" step="1" value="0" />
     <label>52→1</label>
   </div>
+</div>
+
+<h1>Memories</h1>
+<div id="subtitle" class="subtitle"></div>
+
+<div id="menu-panel" class="menu-panel hidden">
+  <div id="menu" class="menu"></div>
   <button id="reset" style="margin-top:8px; width:100%;">Reset memory</button>
   <button id="reset-all" style="margin-top:6px; width:100%;">Full reset (palier 1)</button>
  </div>
@@ -586,6 +653,11 @@
     <span class="digit-box" data-idx="0">––</span>
   </div>
   <div id="clavier" class="clavier"></div>
+</div>
+
+<div id="tap-zone" class="tap-zone">
+  <input id="tap-input" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="ex: 4 de trefle" />
+  <button id="tap-ok">OK</button>
 </div>
 
 <div class="ligne" id="valeurs"></div>
@@ -678,6 +750,8 @@ let valeurChoisie = null
 let couleurChoisie = null
 let debutTemps = 0
 let modeActuel = "Face"
+const INPUT_MODE_KEY = "memories_input_mode"
+let inputMode = localStorage.getItem(INPUT_MODE_KEY) || "clic"
 let menuOuvert = false
 let menuTimeout = null
 let questionMode = "Face"
@@ -1211,6 +1285,8 @@ function afficherBoutons() {
   const clavier = document.getElementById("clavier")
   const training = document.getElementById("training")
   const ordreToggle = document.getElementById("ordre-toggle")
+  const inputToggle = document.getElementById("input-toggle")
+  const tapZone = document.getElementById("tap-zone")
   const lockBtn = document.getElementById("lock-btn")
   v.innerHTML = ""
   c.innerHTML = ""
@@ -1251,9 +1327,16 @@ function afficherBoutons() {
   document.getElementById("carte").style.display = showTraining ? "none" : "flex"
   training.classList.toggle("visible", showTraining)
   ordreToggle.style.display = modeActuel === "Dos Ordre" ? "flex" : "none"
+  const isDosMode = modeActuel.startsWith("Dos")
+  inputToggle.style.display = (!showTraining && isDosMode) ? "flex" : "none"
+  tapZone.style.display = (!showTraining && isDosMode && inputMode === "tap") ? "flex" : "none"
   if (modeActuel === "Dos Ordre") {
     const range = document.getElementById("ordre-range")
     range.value = dosOrdreDirection === "desc" ? "1" : "0"
+  }
+  if (!showTraining && isDosMode) {
+    const inputRange = document.getElementById("input-range")
+    inputRange.value = inputMode === "tap" ? "1" : "0"
   }
   if (!isTouchDevice || showTraining) {
     lockBtn.style.display = "none"
@@ -1269,6 +1352,11 @@ function afficherBoutons() {
   if (showTraining) {
     renderTraining()
     return
+  }
+
+  if (isDosMode && inputMode === "tap") {
+    document.getElementById("valeurs").style.display = "none"
+    document.getElementById("couleurs").style.display = "none"
   }
 
   VALEUR_GROUPES.forEach(groupe => {
@@ -1339,6 +1427,104 @@ function gererClavier(val) {
     digits.push(val)
     majAffichageDigits()
   }
+}
+
+function normalizeTapInput(text) {
+  return (text || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/(\d+)/g, " $1 ")
+    .trim()
+}
+
+function levenshtein(a, b) {
+  const m = a.length
+  const n = b.length
+  if (!m) return n
+  if (!n) return m
+  const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0))
+  for (let i = 0; i <= m; i++) dp[i][0] = i
+  for (let j = 0; j <= n; j++) dp[0][j] = j
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1
+      dp[i][j] = Math.min(
+        dp[i - 1][j] + 1,
+        dp[i][j - 1] + 1,
+        dp[i - 1][j - 1] + cost
+      )
+    }
+  }
+  return dp[m][n]
+}
+
+function matchSuitToken(token) {
+  if (!token) return null
+  const suitMap = [
+    { suit: "Pique", prefixes: ["piq", "pik", "pic"] },
+    { suit: "Cœur", prefixes: ["coe", "coeu", "coer", "coeur"] },
+    { suit: "Trèfle", prefixes: ["tre", "tref", "trefle", "trf"] },
+    { suit: "Carreau", prefixes: ["car", "carr", "carreau"] }
+  ]
+  for (const entry of suitMap) {
+    if (entry.prefixes.some(p => token.startsWith(p))) return entry.suit
+    const base = entry.prefixes[0].slice(0, 3)
+    const tokenPrefix = token.slice(0, 3)
+    if (tokenPrefix.length === 3 && levenshtein(tokenPrefix, base) <= 1) return entry.suit
+  }
+  return null
+}
+
+function matchValueToken(token) {
+  if (!token) return null
+  if (/^\d+$/.test(token)) {
+    const n = parseInt(token, 10)
+    if (n >= 2 && n <= 10) return String(n)
+    if (n === 1) return "As"
+    if (n === 11) return "Valet"
+    if (n === 12) return "Dame"
+    if (n === 13) return "Roi"
+  }
+  const valueMap = [
+    { word: "as", value: "As" },
+    { word: "valet", value: "Valet" },
+    { word: "dame", value: "Dame" },
+    { word: "roi", value: "Roi" }
+  ]
+  for (const entry of valueMap) {
+    if (token === entry.word) return entry.value
+    if (token.length >= 2 && entry.word.startsWith(token)) return entry.value
+    const base = entry.word.slice(0, 3)
+    const tokenPrefix = token.slice(0, 3)
+    if (tokenPrefix.length === 3 && levenshtein(tokenPrefix, base) <= 1) return entry.value
+  }
+  return null
+}
+
+function parseDosTapInput(text) {
+  const normalized = normalizeTapInput(text)
+  if (!normalized) return null
+  const tokens = normalized.split(/\s+/).filter(Boolean)
+  let valeur = null
+  let couleur = null
+  tokens.forEach((token) => {
+    if (!valeur) valeur = matchValueToken(token)
+    if (!couleur) couleur = matchSuitToken(token)
+  })
+  if (!valeur || !couleur) return null
+  return { valeur, couleur }
+}
+
+function tryApplyTapInput() {
+  const tapInput = document.getElementById("tap-input")
+  if (!tapInput) return false
+  const parsed = parseDosTapInput(tapInput.value)
+  if (!parsed) return false
+  valeurChoisie = parsed.valeur
+  couleurChoisie = parsed.couleur
+  return true
 }
 
 function majStats() {
@@ -1617,8 +1803,9 @@ function afficherCarte() {
     faceImg.removeAttribute("src")
     numeroEl.textContent = carteActuelle.numero
     zoneNumeric.classList.remove("visible")
-    zoneValeurs.style.display = "flex"
-    zoneCouleurs.style.display = "flex"
+    const hideButtons = inputMode === "tap" && modeActuel.startsWith("Dos")
+    zoneValeurs.style.display = hideButtons ? "none" : "flex"
+    zoneCouleurs.style.display = hideButtons ? "none" : "flex"
   } else {
     zoneNumeric.style.display = "flex"
     const symbole = SUIT_SYMBOLS[carteActuelle.couleur] || carteActuelle.couleur
@@ -1645,6 +1832,8 @@ function afficherCarte() {
   correction.classList.remove("visible")
   correction.textContent = ""
   document.getElementById("stage-message").classList.remove("visible")
+  const tapInput = document.getElementById("tap-input")
+  if (tapInput) tapInput.value = ""
   valeurChoisie = null
   couleurChoisie = null
   digits = []
@@ -1665,6 +1854,9 @@ function tenterValidation() {
   if (answering) return
   // mode dos : applique les sélections visuelles
   if (questionMode === "Dos" || modeActuel.startsWith("Dos")) {
+    if (questionMode === "Dos" && inputMode === "tap" && modeActuel.startsWith("Dos") && (!valeurChoisie || !couleurChoisie)) {
+      tryApplyTapInput()
+    }
     if (valeurChoisie) {
       valeurBtns.forEach(btn => {
         btn.classList.toggle("selected-choice", btn.textContent === valeurChoisie)
@@ -2065,6 +2257,9 @@ const resetBtn = document.getElementById("reset")
 const resetAllBtn = document.getElementById("reset-all")
 const lockBtn = document.getElementById("lock-btn")
 const ordreRange = document.getElementById("ordre-range")
+const inputRange = document.getElementById("input-range")
+const tapInputField = document.getElementById("tap-input")
+const tapOkBtn = document.getElementById("tap-ok")
 burgerBtn.addEventListener("click", (e) => { e.stopPropagation(); haptic(); setMenu(!menuOuvert) })
 menuPanel.addEventListener("click", (e) => e.stopPropagation())
 document.addEventListener("click", () => setMenu(false))
@@ -2080,6 +2275,27 @@ ordreRange.addEventListener("input", (e) => {
   sauvegarder()
   majStats()
   if (modeActuel === "Dos Ordre") prochaineCarte()
+})
+inputRange.addEventListener("input", (e) => {
+  inputMode = e.target.value === "1" ? "tap" : "clic"
+  localStorage.setItem(INPUT_MODE_KEY, inputMode)
+  afficherBoutons()
+  afficherCarte()
+})
+tapOkBtn.addEventListener("click", (e) => {
+  e.stopPropagation()
+  haptic()
+  if (tryApplyTapInput()) {
+    tenterValidation()
+  }
+})
+tapInputField.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") {
+    e.preventDefault()
+    if (tryApplyTapInput()) {
+      tenterValidation()
+    }
+  }
 })
 setMenu(false)
 setScrollLock(false)
@@ -2111,6 +2327,10 @@ document.addEventListener("keydown", (e) => {
       handler()
       return
     }
+  }
+
+  if (inputMode === "tap" && isDosMode) {
+    return
   }
 
   // Raccourcis Dos : 1-13 pour As-Roi, a/e/q/d pour Pique/Cœur/Trèfle/Carreau
