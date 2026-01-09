@@ -1339,7 +1339,7 @@ function afficherBoutons() {
   ordreToggle.style.display = modeActuel === "Dos Ordre" ? "flex" : "none"
   const isDosMode = modeActuel.startsWith("Dos") || modeActuel === "Mixte"
   inputToggle.style.display = (!showTraining && isDosMode) ? "flex" : "none"
-  tapZone.style.display = (!showTraining && isDosMode && inputMode === "tap" && questionMode === "Dos") ? "flex" : "none"
+  tapZone.style.display = (!showTraining && isDosMode && inputMode === "tap") ? "flex" : "none"
   if (modeActuel === "Dos Ordre") {
     const range = document.getElementById("ordre-range")
     range.value = dosOrdreDirection === "desc" ? "1" : "0"
