@@ -1337,9 +1337,9 @@ function afficherBoutons() {
   document.getElementById("carte").style.display = showTraining ? "none" : "flex"
   training.classList.toggle("visible", showTraining)
   ordreToggle.style.display = modeActuel === "Dos Ordre" ? "flex" : "none"
-  const isDosMode = modeActuel.startsWith("Dos")
+  const isDosMode = modeActuel.startsWith("Dos") || modeActuel === "Mixte"
   inputToggle.style.display = (!showTraining && isDosMode) ? "flex" : "none"
-  tapZone.style.display = (!showTraining && isDosMode && inputMode === "tap") ? "flex" : "none"
+  tapZone.style.display = (!showTraining && isDosMode && inputMode === "tap" && questionMode === "Dos") ? "flex" : "none"
   if (modeActuel === "Dos Ordre") {
     const range = document.getElementById("ordre-range")
     range.value = dosOrdreDirection === "desc" ? "1" : "0"
@@ -1364,7 +1364,7 @@ function afficherBoutons() {
     return
   }
 
-  if (isDosMode && inputMode === "tap") {
+  if (isDosMode && inputMode === "tap" && questionMode === "Dos") {
     document.getElementById("valeurs").style.display = "none"
     document.getElementById("couleurs").style.display = "none"
   }
@@ -1978,6 +1978,9 @@ function tenterValidation() {
     }, 200)
   } else {
     showDeltaBadge(delta, false)
+    if (modeActuel === "Dos Ordre") {
+      return
+    }
     const handler = () => {
       if (Date.now() < ignoreClicksUntil) return
       flash.classList.remove("visible")
