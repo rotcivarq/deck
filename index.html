@@ -761,7 +761,7 @@ let couleurChoisie = null
 let debutTemps = 0
 let modeActuel = "Face"
 const INPUT_MODE_KEY = "memories_input_mode"
-let inputMode = localStorage.getItem(INPUT_MODE_KEY) || "clic"
+let inputMode = localStorage.getItem(INPUT_MODE_KEY) || "tap"
 let menuOuvert = false
 let menuTimeout = null
 let questionMode = "Face"
@@ -1869,7 +1869,13 @@ function afficherCarte() {
   correction.textContent = ""
   document.getElementById("stage-message").classList.remove("visible")
   const tapInput = document.getElementById("tap-input")
-  if (tapInput) tapInput.value = ""
+  if (tapInput) {
+    const shouldKeep = inputMode === "tap" && (modeActuel.startsWith("Dos") || modeActuel === "Mixte") && questionMode === "Dos" && tapLastInputAt > tapValidationAt
+    if (!shouldKeep) tapInput.value = ""
+    if (inputMode === "tap" && questionMode === "Dos" && !modeActuel.endsWith("Ordre")) {
+      tapInput.focus()
+    }
+  }
   valeurChoisie = null
   couleurChoisie = null
   digits = []
